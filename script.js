@@ -145,7 +145,7 @@ function beginEntry(now) {
   aud.volume = 0;
   aud.play().catch(() => {});
 
-  nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
+  nextAmbientDisturbAt = now + 5000 + Math.random() * 22000;
 }
 
 function startHold(e) {
@@ -200,7 +200,7 @@ function loop(now) {
   if (entered) intensity = 1.55;
 
   if (now < entryDisturbUntil) {
-    const left = (entryDisturbUntil - now) / 1800;
+    const left = (entryDisturbUntil - now) / 5000;
     intensity += left * 4.2;
   }
 
@@ -229,7 +229,7 @@ scaleY(${scaleY})
 
   let brightness = 1 - progress * 0.13;
   if (entered && now < entryDisturbUntil) {
-    const left = (entryDisturbUntil - now) / 1800;
+    const left = (entryDisturbUntil - now) / 5000;
     brightness -= left * 0.08;
   } else if (entered && now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
