@@ -227,11 +227,11 @@ function loop(now) {
   let intensity = 1.25 + progress * 6.2;
   if (entered) intensity = 1.55;
   if (now < entryDisturbUntil) {
-    const left = (entryDisturbUntil - now) / 1800;
+    const left = (entryDisturbUntil - now) / 5000;
     intensity += left * 4.2;
   }
   if (now < ambientDisturbUntil) {
-    const left = (ambientDisturbUntil - now) / 1700;
+    const left = (ambientDisturbUntil - now) / 4950;
     intensity += 0.9 * Math.max(0.2, left);
   }
   drawNoise(intensity);
