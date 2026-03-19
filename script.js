@@ -99,7 +99,7 @@ function drawNoise(intensity) {
 function beginEntry(now) {
   entered = true;
   document.body.classList.add("entered");
-  entryDisturbUntil = now + 1800;
+  entryDisturbUntil = now + 5000;
   audioFadeStart = now;
 
   const startVideo = () => {
