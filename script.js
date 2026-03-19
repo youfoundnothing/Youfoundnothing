@@ -30,7 +30,9 @@ let nextAmbientDisturbAt = 0;
 let preArrivalStart = null;
 const preArrivalDuration = 1700;
 let arrivalStart = null;
-const arrivalDuration = 4200;
+const arrivalDuration = 9000;
+let exitStart = null;
+const exitDuration = 5000;
 
 const splashTargetVolume = 0.52;
 const chamberTargetVolume = 0.56;
@@ -123,6 +125,7 @@ function ensureSplashStarted() {
 function beginPreArrival(now) {
   if (preArrivalStart !== null || entered) return;
   preArrivalStart = now;
+  exitStart = null;
 
   if (chamberAudio.readyState >= 1) {
     try {
@@ -165,6 +168,7 @@ function beginPreArrival(now) {
 function completeArrival(now) {
   entered = true;
   arrivalStart = now;
+  exitStart = null;
   nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
 }
 
@@ -178,9 +182,15 @@ function startHold(e) {
 
 function endHold(e) {
   if (e && e.cancelable) e.preventDefault();
-  if (entered) return;
-  holding = false;
-  holdStart = null;
+  if (!entered) {
+    holding = false;
+    holdStart = null;
+    return;
+  }
+
+  if (exitStart === null) {
+    exitStart = performance.now();
+  }
 }
 
 document.addEventListener("contextmenu", e => e.preventDefault());
@@ -289,13 +299,40 @@ function loop(now) {
 
   if (preArrivalStart !== null) {
     let chamberVol = 0;
+
     if (!entered) {
-      chamberVol = preMix * 0.14;
+      chamberVol = preMix * 0.12;
     } else {
       const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
       const wobble = Math.sin(T * 0.37) * 0.01;
-      chamberVol = Math.min(chamberTargetVolume, 0.10 + arriveMix * chamberTargetVolume + wobble);
+
+      let baseVol = Math.min(chamberTargetVolume, 0.08 + arriveMix * chamberTargetVolume + wobble);
+
+      if (exitStart !== null) {
+        const exitMix = Math.min(1, (now - exitStart) / exitDuration);
+        const eased = 1 - Math.pow(exitMix, 1.8);
+        baseVol *= eased;
+
+        if (exitMix >= 1) {
+          entered = false;
+          holding = false;
+          holdStart = null;
+          preArrivalStart = null;
+          arrivalStart = null;
+          exitStart = null;
+          ambientDisturbUntil = 0;
+          nextAmbientDisturbAt = 0;
+
+          try { chamberAudio.pause(); } catch (e) {}
+          chamberAudio.currentTime = 0;
+          vid.style.opacity = 0;
+          chamberVol = 0;
+        }
+      }
+
+      chamberVol = baseVol;
     }
+
     chamberAudio.volume = Math.max(0, Math.min(chamberTargetVolume, chamberVol));
   }
 
