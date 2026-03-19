@@ -42,3 +42,12 @@ V27 changes:
 - audio now uses Web Audio API gain nodes for true smooth fades on iPhone/Safari
 - chamber fade in/out is controlled by audio engine instead of HTMLAudio volume
 - visual chamber mix remains aligned with audio emergence/recession
+
+
+V28 changes:
+- simplified to an on/off switch model
+- press anywhere = 9 second fade up
+- release anywhere = 9 second fade down
+- fades are fully reversible from whatever point they are at
+- video and audio both follow the same single progress value
+- chamber can be entered and left repeatedly without one-time state issues
