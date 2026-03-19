@@ -4,15 +4,12 @@ const noise = document.getElementById("noise");
 const nctx = noise.getContext("2d");
 const t = document.getElementById("text");
 const vid = document.getElementById("video");
-const splashAudio = document.getElementById("splashAudio");
-const chamberAudio = document.getElementById("chamberAudio");
+const splashEl = document.getElementById("splashAudio");
+const chamberEl = document.getElementById("chamberAudio");
 
 vid.src = "video.mp4";
-splashAudio.src = "splash.mp3";
-chamberAudio.src = "audio.mp3";
-
-splashAudio.load();
-chamberAudio.load();
+splashEl.src = "splash.mp3";
+chamberEl.src = "audio.mp3";
 
 let w = 0, h = 0;
 let noiseData;
@@ -34,12 +31,20 @@ const arrivalDuration = 9000;
 let exitStart = null;
 const exitDuration = 9000;
 
-// smoother chamber presence control
 let chamberMix = 0;
 let chamberTargetMix = 0;
 
 const splashTargetVolume = 0.52;
 const chamberTargetVolume = 0.56;
+
+// Web Audio
+let audioCtx = null;
+let splashSource = null;
+let chamberSource = null;
+let masterGain = null;
+let splashGain = null;
+let chamberGain = null;
+let audioReady = false;
 
 function resize() {
   w = window.innerWidth;
@@ -115,15 +120,65 @@ function drawNoise(intensity) {
   nctx.putImageData(noiseData, 0, 0);
 }
 
-function ensureSplashStarted() {
+async function setupAudio() {
+  if (audioReady) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") {
+    await audioCtx.resume();
+  }
+
+  masterGain = audioCtx.createGain();
+  splashGain = audioCtx.createGain();
+  chamberGain = audioCtx.createGain();
+
+  splashGain.gain.value = 0;
+  chamberGain.gain.value = 0;
+  masterGain.gain.value = 1;
+
+  splashSource = audioCtx.createMediaElementSource(splashEl);
+  chamberSource = audioCtx.createMediaElementSource(chamberEl);
+
+  splashSource.connect(splashGain);
+  chamberSource.connect(chamberGain);
+  splashGain.connect(masterGain);
+  chamberGain.connect(masterGain);
+  masterGain.connect(audioCtx.destination);
+
+  audioReady = true;
+}
+
+function setGainSmooth(gainNode, value, seconds = 3.0) {
+  if (!audioCtx || !gainNode) return;
+  const now = audioCtx.currentTime;
+  const current = Math.max(0.0001, gainNode.gain.value);
+  gainNode.gain.cancelScheduledValues(now);
+  gainNode.gain.setValueAtTime(current, now);
+  gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, value), now + seconds);
+}
+
+async function ensureSplashStarted() {
+  await setupAudio();
+  if (audioCtx.state === "suspended") {
+    await audioCtx.resume();
+  }
   if (splashStarted) return;
   splashStarted = true;
-  splashAudio.volume = 0;
-  splashAudio.play().catch(() => {});
-  chamberAudio.play().then(() => {
-    chamberAudio.pause();
-    chamberAudio.currentTime = 0;
-  }).catch(() => {});
+
+  splashEl.loop = True
+  splashEl.loop = true;
+  chamberEl.loop = true;
+
+  splashEl.volume = 1;
+  chamberEl.volume = 1;
+
+  try { await splashEl.play(); } catch (e) {}
+  try {
+    await chamberEl.play();
+    chamberEl.pause();
+    chamberEl.currentTime = 0;
+  } catch (e) {}
+
+  setGainSmooth(splashGain, splashTargetVolume * 0.72, 2.5);
 }
 
 function beginPreArrival(now) {
@@ -131,24 +186,24 @@ function beginPreArrival(now) {
   preArrivalStart = now;
   exitStart = null;
 
-  if (chamberAudio.readyState >= 1) {
+  if (chamberEl.readyState >= 1) {
     try {
-      if (chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
-        chamberAudio.currentTime = Math.random() * chamberAudio.duration;
+      if (chamberEl.duration && isFinite(chamberEl.duration) && chamberEl.duration > 0) {
+        chamberEl.currentTime = Math.random() * chamberEl.duration;
       }
     } catch (e) {}
   } else {
-    chamberAudio.addEventListener("loadedmetadata", () => {
+    chamberEl.addEventListener("loadedmetadata", () => {
       try {
-        if (chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
-          chamberAudio.currentTime = Math.random() * chamberAudio.duration;
+        if (chamberEl.duration && isFinite(chamberEl.duration) && chamberEl.duration > 0) {
+          chamberEl.currentTime = Math.random() * chamberEl.duration;
         }
       } catch (e) {}
     }, { once: true });
   }
 
-  chamberAudio.volume = 0;
-  chamberAudio.play().catch(() => {});
+  chamberEl.volume = 1;
+  chamberEl.play().catch(() => {});
 
   if (vid.readyState >= 1) {
     try {
@@ -177,6 +232,12 @@ function completeArrival(now) {
   nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
 }
 
+function beginExit(now) {
+  if (exitStart !== null) return;
+  exitStart = now;
+  chamberTargetMix = 0;
+}
+
 function startHold(e) {
   if (entered) return;
   if (e.cancelable) e.preventDefault();
@@ -192,11 +253,7 @@ function endHold(e) {
     holdStart = null;
     return;
   }
-
-  if (exitStart === null) {
-    exitStart = performance.now();
-    chamberTargetMix = 0;
-  }
+  beginExit(performance.now());
 }
 
 document.addEventListener("contextmenu", e => e.preventDefault());
@@ -224,9 +281,10 @@ function loop(now) {
   }
   const progress = Math.pow(raw, 3.2);
 
-  // smooth chamber presence over time so it actually fades
-  const fadeInRate = Math.min(1, (16 / arrivalDuration) * 1.35);
-  const fadeOutRate = Math.min(1, (16 / exitDuration) * 1.35);
+  // smooth chamber presence
+  const dt = 16;
+  const fadeInRate = Math.min(1, (dt / arrivalDuration) * 1.55);
+  const fadeOutRate = Math.min(1, (dt / exitDuration) * 1.55);
   if (chamberTargetMix > chamberMix) {
     chamberMix += (chamberTargetMix - chamberMix) * fadeInRate;
   } else if (chamberTargetMix < chamberMix) {
@@ -256,7 +314,6 @@ function loop(now) {
     const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
   }
-
   drawNoise(intensity);
 
   const dx = Math.sin(T * .19) * .16 + driftImpulse;
@@ -275,10 +332,9 @@ function loop(now) {
     textOpacity = 0.48 - preMix * 0.22;
     textBlur = 0.62 + preMix * 0.35;
   }
-  if (entered) {
-    const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
-    textOpacity = 0.26 - arriveMix * 0.22;
-    textBlur = 0.92 + arriveMix * 0.18;
+  if (entered || chamberMix > 0.01) {
+    textOpacity = Math.max(0.04, 0.26 - chamberMix * 0.22);
+    textBlur = 0.92 + chamberMix * 0.18;
   }
   t.style.opacity = `${Math.max(0.04, textOpacity)}`;
   t.style.filter = `blur(${Math.max(0.4, textBlur)}px)`;
@@ -291,14 +347,43 @@ function loop(now) {
   }
   document.body.style.filter = `brightness(${brightness})`;
 
-  if (!entered && splashStarted) {
-    let splashVol = splashTargetVolume * (0.72 + progress * 0.16);
-    if (preArrivalStart !== null) splashVol *= (1 - preMix * 0.68);
-    splashAudio.volume = Math.max(0, Math.min(splashTargetVolume, splashVol));
+  // audio via Web Audio
+  if (audioReady) {
+    if (!entered && splashStarted) {
+      let splashVol = splashTargetVolume * (0.72 + progress * 0.16);
+      if (preArrivalStart !== null) splashVol *= (1 - preMix * 0.42);
+      if (chamberMix > 0.001) splashVol *= (1 - chamberMix * 0.35);
+      splashGain.gain.value = Math.max(0.0001, splashVol);
+    }
+
+    if (preArrivalStart !== null) {
+      const traceVol = !entered ? preMix * 0.03 : 0;
+      const wobble = Math.sin(T * 0.37) * 0.003;
+      const chamberVol = Math.max(traceVol, chamberMix * chamberTargetVolume + wobble);
+      chamberGain.gain.value = Math.max(0.0001, Math.min(chamberTargetVolume, chamberVol));
+
+      if (exitStart !== null && chamberMix <= 0.004) {
+        entered = false;
+        holding = false;
+        holdStart = null;
+        preArrivalStart = null;
+        arrivalStart = null;
+        exitStart = null;
+        chamberTargetMix = 0;
+        chamberMix = 0;
+        ambientDisturbUntil = 0;
+        nextAmbientDisturbAt = 0;
+
+        try { chamberEl.pause(); } catch (e) {}
+        chamberEl.currentTime = 0;
+        chamberGain.gain.value = 0.0001;
+        vid.style.opacity = 0;
+      }
+    }
   }
 
+  // video follows chamber mix
   if (preArrivalStart !== null) {
-    // keep pre-arrival trace very subtle so arrival doesn't feel like a hard trigger
     const traceMix = !entered ? preMix * 0.08 : 0;
     const vidMix = Math.max(traceMix, chamberMix);
 
@@ -308,33 +393,6 @@ function loop(now) {
     const videoBrightness = 0.89 + Math.sin(T * 0.12 + 0.8) * 0.018 - (preMix * 0.008);
     const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
     vid.style.filter = `blur(${2.5 - vidMix * 0.75}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
-  }
-
-  if (preArrivalStart !== null) {
-    // keep chamber barely perceptible before arrival, then let it emerge slowly
-    const traceVol = !entered ? preMix * 0.035 : 0;
-    const wobble = Math.sin(T * 0.37) * 0.004;
-    const chamberVol = Math.max(traceVol, chamberMix * chamberTargetVolume + wobble);
-
-    chamberAudio.volume = Math.max(0, Math.min(chamberTargetVolume, chamberVol));
-
-    // once chamber fully fades away on exit, reset state quietly
-    if (exitStart !== null && chamberMix <= 0.004) {
-      entered = false;
-      holding = false;
-      holdStart = null;
-      preArrivalStart = null;
-      arrivalStart = null;
-      exitStart = null;
-      chamberTargetMix = 0;
-      chamberMix = 0;
-      ambientDisturbUntil = 0;
-      nextAmbientDisturbAt = 0;
-
-      try { chamberAudio.pause(); } catch (e) {}
-      chamberAudio.currentTime = 0;
-      vid.style.opacity = 0;
-    }
   }
 
   requestAnimationFrame(loop);

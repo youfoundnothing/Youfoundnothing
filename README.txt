@@ -36,3 +36,9 @@ V26 changes:
 - chamber fade now uses a smooth mix value instead of abrupt state math
 - pre-arrival chamber/audio traces are much lower so the full arrival reads less like a jump
 - video fade follows the same smoother chamber mix
+
+
+V27 changes:
+- audio now uses Web Audio API gain nodes for true smooth fades on iPhone/Safari
+- chamber fade in/out is controlled by audio engine instead of HTMLAudio volume
+- visual chamber mix remains aligned with audio emergence/recession
