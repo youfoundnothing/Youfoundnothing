@@ -7,15 +7,16 @@ const vid = document.getElementById("video");
 const splashAudio = document.getElementById("splashAudio");
 const chamberAudio = document.getElementById("chamberAudio");
 
-// Root-level files for GitHub Pages
 vid.src = "video.mp4";
-splashAudio.src = "splash.mp3";   // 5-second slow-attack home-page loop
-chamberAudio.src = "audio.mp3";   // chamber audio after push-through
-chamberAudio.load();
+splashAudio.src = "splash.mp3";
+chamberAudio.src = "audio.mp3";
+
 splashAudio.load();
+chamberAudio.load();
 
 let w = 0, h = 0;
 let noiseData;
+
 let entered = false;
 let holdStart = null;
 let holding = false;
@@ -23,16 +24,16 @@ let splashStarted = false;
 
 let driftImpulse = 0;
 let lastImpulse = 0;
-let entryDisturbUntil = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
 
-let splashFadeOutStart = null;
-let splashFadeOutDuration = 2200;
-let chamberFadeStart = null;
-let chamberFadeDuration = 4200;
+let preArrivalStart = null;
+const preArrivalDuration = 1700;
+let arrivalStart = null;
+const arrivalDuration = 4200;
+
 const splashTargetVolume = 0.52;
-const chamberTargetVolume = 0.58;
+const chamberTargetVolume = 0.56;
 
 function resize() {
   w = window.innerWidth;
@@ -113,40 +114,16 @@ function ensureSplashStarted() {
   splashStarted = true;
   splashAudio.volume = 0;
   splashAudio.play().catch(() => {});
+  chamberAudio.play().then(() => {
+    chamberAudio.pause();
+    chamberAudio.currentTime = 0;
+  }).catch(() => {});
 }
 
-function beginEntry(now) {
-  entered = true;
-  holding = false;
-  holdStart = null;
-  document.body.classList.add("entered");
-  entryDisturbUntil = now + 5000;
-  chamberAudio.volume = 0;
-chamberAudio.currentTime = chamberAudio.currentTime || 0;
-chamberAudio.play().then(() => {
-  chamberAudio.volume = 0;
-}).catch(() => {});
+function beginPreArrival(now) {
+  if (preArrivalStart !== null || entered) return;
+  preArrivalStart = now;
 
-  // Video starts at a random point so it feels already in progress
-  if (vid.readyState >= 1) {
-    try {
-      if (vid.duration && isFinite(vid.duration) && vid.duration > 0) {
-        vid.currentTime = Math.random() * vid.duration;
-      }
-    } catch (e) {}
-  } else {
-    vid.addEventListener("loadedmetadata", () => {
-      try {
-        if (vid.duration && isFinite(vid.duration) && vid.duration > 0) {
-          vid.currentTime = Math.random() * vid.duration;
-        }
-      } catch (e) {}
-    }, { once: true });
-  }
-  vid.playbackRate = 0.92;
-  vid.play().catch(() => {});
-
-  // Chamber audio starts at a random point and fades in
   if (chamberAudio.readyState >= 1) {
     try {
       if (chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
@@ -166,8 +143,28 @@ chamberAudio.play().then(() => {
   chamberAudio.volume = 0;
   chamberAudio.play().catch(() => {});
 
-  splashFadeOutStart = now;
-  chamberFadeStart = now;
+  if (vid.readyState >= 1) {
+    try {
+      if (vid.duration && isFinite(vid.duration) && vid.duration > 0) {
+        vid.currentTime = Math.random() * vid.duration;
+      }
+    } catch (e) {}
+  } else {
+    vid.addEventListener("loadedmetadata", () => {
+      try {
+        if (vid.duration && isFinite(vid.duration) && vid.duration > 0) {
+          vid.currentTime = Math.random() * vid.duration;
+        }
+      } catch (e) {}
+    }, { once: true });
+  }
+  vid.playbackRate = 0.92;
+  vid.play().catch(() => {});
+}
+
+function completeArrival(now) {
+  entered = true;
+  arrivalStart = now;
   nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
 }
 
@@ -177,10 +174,6 @@ function startHold(e) {
   holding = true;
   holdStart = performance.now();
   ensureSplashStarted();
-  chamberAudio.play().then(() => {
-  chamberAudio.pause();
-  chamberAudio.currentTime = 0;
-}).catch(() => {});
 }
 
 function endHold(e) {
@@ -215,8 +208,11 @@ function loop(now) {
   }
   const progress = Math.pow(raw, 3.2);
 
-  if (!entered && progress > 0.95) {
-    beginEntry(now);
+  if (!entered && preArrivalStart === null && progress > 0.72) {
+    beginPreArrival(now);
+  }
+  if (!entered && progress > 0.95 && preArrivalStart !== null) {
+    completeArrival(now);
   }
 
   if (entered && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
@@ -224,16 +220,18 @@ function loop(now) {
     nextAmbientDisturbAt = now + 20000 + Math.random() * 26000;
   }
 
-  let intensity = 1.25 + progress * 6.2;
-  if (entered) intensity = 1.55;
-  if (now < entryDisturbUntil) {
-    const left = (entryDisturbUntil - now) / 5000;
-    intensity += left * 4.2;
+  let intensity = 1.25 + progress * 4.2;
+  let preMix = 0;
+  if (preArrivalStart !== null && !entered) {
+    preMix = Math.min(1, (now - preArrivalStart) / preArrivalDuration);
+    intensity += 0.9 + preMix * 2.2;
   }
+  if (entered) intensity = 1.55;
   if (now < ambientDisturbUntil) {
-    const left = (ambientDisturbUntil - now) / 4950;
+    const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
   }
+
   drawNoise(intensity);
 
   const dx = Math.sin(T * .19) * .16 + driftImpulse;
@@ -245,59 +243,60 @@ function loop(now) {
 
   t.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY})`;
   t.style.letterSpacing = `${0.028 - progress * 0.008}em`;
-  t.style.opacity = `${0.42 + progress * 0.24}`;
-  t.style.filter = `blur(${0.72 - progress * 0.32}px)`;
 
-  let brightness = 1 - progress * 0.13;
-  if (entered && now < entryDisturbUntil) {
-    const left = (entryDisturbUntil - now) / 1800;
-    brightness -= left * 0.08;
-  } else if (entered && now < ambientDisturbUntil) {
+  let textOpacity = 0.42 + progress * 0.18;
+  let textBlur = 0.72 - progress * 0.22;
+  if (preArrivalStart !== null && !entered) {
+    textOpacity = 0.48 - preMix * 0.22;
+    textBlur = 0.62 + preMix * 0.35;
+  }
+  if (entered) {
+    const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
+    textOpacity = 0.26 - arriveMix * 0.22;
+    textBlur = 0.92 + arriveMix * 0.18;
+  }
+  t.style.opacity = `${Math.max(0.04, textOpacity)}`;
+  t.style.filter = `blur(${Math.max(0.4, textBlur)}px)`;
+
+  let brightness = 1 - progress * 0.08;
+  if (preArrivalStart !== null && !entered) brightness -= preMix * 0.08;
+  if (entered && now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     brightness -= left * 0.035;
   }
   document.body.style.filter = `brightness(${brightness})`;
 
-  // Home-page splash audio slowly attacks once user first interacts
   if (!entered && splashStarted) {
-    // On the home page, let the splash loop live at a calm volume,
-    // then push slightly harder as pressure builds.
-    const splashHome = splashTargetVolume * (0.7 + progress * 0.3);
-    splashAudio.volume = Math.min(splashTargetVolume, splashHome);
+    let splashVol = splashTargetVolume * (0.72 + progress * 0.16);
+    if (preArrivalStart !== null) splashVol *= (1 - preMix * 0.68);
+    splashAudio.volume = Math.max(0, Math.min(splashTargetVolume, splashVol));
   }
 
-  if (entered) {
-    const videoOpacity = 0.82 + Math.sin(T * 0.19) * 0.018;
-    vid.style.opacity = videoOpacity.toFixed(3);
-    const videoBrightness = 0.88 + Math.sin(T * 0.12 + 0.8) * 0.02;
-    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
-    vid.style.filter = `blur(2px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.82)`;
-
-    // Fade splash out after entry
-    if (splashFadeOutStart !== null) {
-      const fadeT = Math.min(1, (now - splashFadeOutStart) / splashFadeOutDuration);
-      const eased = 1 - Math.pow(1 - fadeT, 2);
-      splashAudio.volume = Math.max(0, splashTargetVolume * (1 - eased));
-      if (fadeT >= 1) {
-        splashAudio.volume = 0;
-        splashFadeOutStart = null;
-        try { splashAudio.pause(); } catch (e) {}
-      }
+  if (preArrivalStart !== null) {
+    let vidMix = preMix * 0.32;
+    if (entered) {
+      const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
+      vidMix = 0.18 + arriveMix * 0.64;
     }
 
-    // Fade chamber audio in
-    if (chamberFadeStart !== null) {
-      const fadeT = Math.min(1, (now - chamberFadeStart) / chamberFadeDuration);
-      const eased = 1 - Math.pow(1 - fadeT, 2);
-      const wobble = Math.sin(T * 0.37) * 0.01;
-      chamberAudio.volume = Math.max(0, Math.min(chamberTargetVolume, eased * chamberTargetVolume + wobble));
-      if (fadeT >= 1) {
-        chamberFadeStart = null;
-      }
+    const videoOpacity = 0.06 + vidMix * 0.78 + Math.sin(T * 0.19) * 0.012;
+    vid.style.opacity = Math.max(0, Math.min(0.84, videoOpacity)).toFixed(3);
+
+    const videoBrightness = 0.84 + Math.sin(T * 0.12 + 0.8) * 0.02 - (preMix * 0.02);
+    const videoContrast = 1.08 + Math.sin(T * 0.09) * 0.02;
+    vid.style.filter = `blur(${2.5 - vidMix * 0.7}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
+  }
+
+  if (preArrivalStart !== null) {
+    let chamberVol = 0;
+    if (!entered) {
+      chamberVol = preMix * 0.14;
     } else {
-      const ambientWobble = Math.sin(T * 0.31) * 0.008;
-      chamberAudio.volume = Math.max(0.48, Math.min(chamberTargetVolume + 0.02, chamberTargetVolume + ambientWobble));
+      const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
+      const wobble = Math.sin(T * 0.37) * 0.01;
+      chamberVol = Math.min(chamberTargetVolume, 0.10 + arriveMix * chamberTargetVolume + wobble);
     }
+    chamberAudio.volume = Math.max(0, Math.min(chamberTargetVolume, chamberVol));
   }
 
   requestAnimationFrame(loop);
