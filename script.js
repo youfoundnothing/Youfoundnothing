@@ -11,6 +11,8 @@ const chamberAudio = document.getElementById("chamberAudio");
 vid.src = "video.mp4";
 splashAudio.src = "splash.mp3";   // 5-second slow-attack home-page loop
 chamberAudio.src = "audio.mp3";   // chamber audio after push-through
+chamberAudio.load();
+splashAudio.load();
 
 let w = 0, h = 0;
 let noiseData;
@@ -118,7 +120,12 @@ function beginEntry(now) {
   holding = false;
   holdStart = null;
   document.body.classList.add("entered");
-  entryDisturbUntil = now + 1800;
+  entryDisturbUntil = now + 5000;
+  chamberAudio.volume = 0;
+chamberAudio.currentTime = chamberAudio.currentTime || 0;
+chamberAudio.play().then(() => {
+  chamberAudio.volume = 0;
+}).catch(() => {});
 
   // Video starts at a random point so it feels already in progress
   if (vid.readyState >= 1) {
@@ -170,6 +177,10 @@ function startHold(e) {
   holding = true;
   holdStart = performance.now();
   ensureSplashStarted();
+  chamberAudio.play().then(() => {
+  chamberAudio.pause();
+  chamberAudio.currentTime = 0;
+}).catch(() => {});
 }
 
 function endHold(e) {
