@@ -14,10 +14,10 @@ body {
   position: relative;
 }
 #bg, #noise, #video {
-  position: absolute;
-  width: 100%;
-  height: 100%;
+  position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
 }
 #bg {
   filter: blur(8px) contrast(138%) brightness(1.28) saturate(0.72);
@@ -28,10 +28,14 @@ body {
   mix-blend-mode: screen;
 }
 #video {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   object-fit: cover;
   opacity: 0;
   filter: blur(2px) contrast(110%) brightness(.88) saturate(.82);
-  transition: opacity 2.8s ease;
+  transition: opacity 2.4s ease;
 }
 body.entered #video {
   opacity: .82;
@@ -41,10 +45,16 @@ body.entered #video {
   left: 48%;
   top: 61%;
   transform: translate(-50%, -50%);
-  font-family: Georgia, serif;
-  font-size: clamp(14px, 3.6vw, 23px);
-  color: rgba(108,108,108,.48);
-  pointer-events: none;
+  z-index: 3;
+}
+
+#text {
+  display: inline-block;
+  line-height: 0.95;
+}
+
+#text span {
+  display: block;
 }
 #text {
   opacity: .42;
