@@ -32,7 +32,7 @@ const preArrivalDuration = 1700;
 let arrivalStart = null;
 const arrivalDuration = 9000;
 let exitStart = null;
-const exitDuration = 5000;
+const exitDuration = 9000;
 
 const splashTargetVolume = 0.52;
 const chamberTargetVolume = 0.56;
@@ -283,35 +283,44 @@ function loop(now) {
   }
 
   if (preArrivalStart !== null) {
-    let vidMix = preMix * 0.32;
+    let vidMix = preMix * 0.26;
+
     if (entered) {
       const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
-      vidMix = 0.18 + arriveMix * 0.64;
+      const arriveEased = 1 - Math.pow(1 - arriveMix, 2.2);
+      vidMix = 0.12 + arriveEased * 0.70;
+
+      if (exitStart !== null) {
+        const exitMix = Math.min(1, (now - exitStart) / exitDuration);
+        const exitEased = 1 - Math.pow(exitMix, 1.35);
+        vidMix *= exitEased;
+      }
     }
 
-    const videoOpacity = 0.06 + vidMix * 0.78 + Math.sin(T * 0.19) * 0.012;
-    vid.style.opacity = Math.max(0, Math.min(0.84, videoOpacity)).toFixed(3);
+    const videoOpacity = 0.05 + vidMix * 0.82 + Math.sin(T * 0.19) * 0.01;
+    vid.style.opacity = Math.max(0, Math.min(0.86, videoOpacity)).toFixed(3);
 
-    const videoBrightness = 0.84 + Math.sin(T * 0.12 + 0.8) * 0.02 - (preMix * 0.02);
-    const videoContrast = 1.08 + Math.sin(T * 0.09) * 0.02;
-    vid.style.filter = `blur(${2.5 - vidMix * 0.7}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
+    const videoBrightness = 0.88 + Math.sin(T * 0.12 + 0.8) * 0.02 - (preMix * 0.015);
+    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
+    vid.style.filter = `blur(${2.5 - vidMix * 0.75}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
   }
 
   if (preArrivalStart !== null) {
     let chamberVol = 0;
 
     if (!entered) {
-      chamberVol = preMix * 0.12;
+      chamberVol = preMix * 0.10;
     } else {
       const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
-      const wobble = Math.sin(T * 0.37) * 0.01;
+      const arriveEased = 1 - Math.pow(1 - arriveMix, 2.4);
+      const wobble = Math.sin(T * 0.37) * 0.006;
 
-      let baseVol = Math.min(chamberTargetVolume, 0.08 + arriveMix * chamberTargetVolume + wobble);
+      let baseVol = arriveEased * chamberTargetVolume + wobble;
 
       if (exitStart !== null) {
         const exitMix = Math.min(1, (now - exitStart) / exitDuration);
-        const eased = 1 - Math.pow(exitMix, 1.8);
-        baseVol *= eased;
+        const exitEased = 1 - Math.pow(exitMix, 1.35);
+        baseVol *= exitEased;
 
         if (exitMix >= 1) {
           entered = false;

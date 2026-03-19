@@ -20,11 +20,11 @@ body {
   inset: 0;
 }
 #bg {
-  filter: blur(8px) contrast(138%) brightness(1.28) saturate(0.72);
+  filter: blur(8px) contrast(140%) brightness(1.40) saturate(0.74);
 }
 #noise {
   pointer-events: none;
-  opacity: .12;
+  opacity: .14;
   mix-blend-mode: screen;
 }
 #video {
