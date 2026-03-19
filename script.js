@@ -183,7 +183,7 @@ function loop(now) {
 
   let raw = 0;
   if (holding && holdStart && !entered) {
-    raw = Math.min(1, (now - holdStart) / 1800);
+    raw = Math.min(1, (now - holdStart) / 5000);
   }
   const progress = Math.pow(raw, 2.2);
 
@@ -218,8 +218,12 @@ function loop(now) {
   const textDx = dx * (1 - progress * .10);
   const textDy = dy * (1 - progress * .08);
 
-  t.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY})`;
-  t.style.letterSpacing = `${0.028 - progress * 0.008}em`;
+  t.style.transform = `
+translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px))
+scaleX(${scaleX})
+scaleY(${scaleY})
+`;
+  t.style.letterSpacing = `${0.028 - progress * 0.008 + (Math.random() - 0.5) * 0.002}em`;
   t.style.opacity = `${0.42 + progress * 0.2}`;
   t.style.filter = `blur(${0.72 - progress * 0.28}px)`;
 
