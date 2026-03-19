@@ -6,8 +6,8 @@ const t = document.getElementById("text");
 const vid = document.getElementById("video");
 const aud = document.getElementById("audio");
 
-vid.src = "media/video.mp4";
-aud.src = "media/audio.mp3";
+vid.src = "video.mp4";
+aud.src = "audio.mp3";
 
 let w, h;
 let holdStart = null;
