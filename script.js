@@ -34,6 +34,10 @@ const arrivalDuration = 9000;
 let exitStart = null;
 const exitDuration = 9000;
 
+// smoother chamber presence control
+let chamberMix = 0;
+let chamberTargetMix = 0;
+
 const splashTargetVolume = 0.52;
 const chamberTargetVolume = 0.56;
 
@@ -169,6 +173,7 @@ function completeArrival(now) {
   entered = true;
   arrivalStart = now;
   exitStart = null;
+  chamberTargetMix = 1;
   nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
 }
 
@@ -190,6 +195,7 @@ function endHold(e) {
 
   if (exitStart === null) {
     exitStart = performance.now();
+    chamberTargetMix = 0;
   }
 }
 
@@ -217,6 +223,15 @@ function loop(now) {
     raw = Math.min(1, (now - holdStart) / 5000);
   }
   const progress = Math.pow(raw, 3.2);
+
+  // smooth chamber presence over time so it actually fades
+  const fadeInRate = Math.min(1, (16 / arrivalDuration) * 1.35);
+  const fadeOutRate = Math.min(1, (16 / exitDuration) * 1.35);
+  if (chamberTargetMix > chamberMix) {
+    chamberMix += (chamberTargetMix - chamberMix) * fadeInRate;
+  } else if (chamberTargetMix < chamberMix) {
+    chamberMix += (chamberTargetMix - chamberMix) * fadeOutRate;
+  }
 
   if (!entered && preArrivalStart === null && progress > 0.72) {
     beginPreArrival(now);
@@ -283,66 +298,43 @@ function loop(now) {
   }
 
   if (preArrivalStart !== null) {
-    let vidMix = preMix * 0.26;
+    // keep pre-arrival trace very subtle so arrival doesn't feel like a hard trigger
+    const traceMix = !entered ? preMix * 0.08 : 0;
+    const vidMix = Math.max(traceMix, chamberMix);
 
-    if (entered) {
-      const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
-      const arriveEased = 1 - Math.pow(1 - arriveMix, 2.2);
-      vidMix = 0.12 + arriveEased * 0.70;
-
-      if (exitStart !== null) {
-        const exitMix = Math.min(1, (now - exitStart) / exitDuration);
-        const exitEased = 1 - Math.pow(exitMix, 1.35);
-        vidMix *= exitEased;
-      }
-    }
-
-    const videoOpacity = 0.05 + vidMix * 0.82 + Math.sin(T * 0.19) * 0.01;
+    const videoOpacity = 0.03 + vidMix * 0.82 + Math.sin(T * 0.19) * 0.008;
     vid.style.opacity = Math.max(0, Math.min(0.86, videoOpacity)).toFixed(3);
 
-    const videoBrightness = 0.88 + Math.sin(T * 0.12 + 0.8) * 0.02 - (preMix * 0.015);
+    const videoBrightness = 0.89 + Math.sin(T * 0.12 + 0.8) * 0.018 - (preMix * 0.008);
     const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
     vid.style.filter = `blur(${2.5 - vidMix * 0.75}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
   }
 
   if (preArrivalStart !== null) {
-    let chamberVol = 0;
-
-    if (!entered) {
-      chamberVol = preMix * 0.10;
-    } else {
-      const arriveMix = Math.min(1, (now - arrivalStart) / arrivalDuration);
-      const arriveEased = 1 - Math.pow(1 - arriveMix, 2.4);
-      const wobble = Math.sin(T * 0.37) * 0.006;
-
-      let baseVol = arriveEased * chamberTargetVolume + wobble;
-
-      if (exitStart !== null) {
-        const exitMix = Math.min(1, (now - exitStart) / exitDuration);
-        const exitEased = 1 - Math.pow(exitMix, 1.35);
-        baseVol *= exitEased;
-
-        if (exitMix >= 1) {
-          entered = false;
-          holding = false;
-          holdStart = null;
-          preArrivalStart = null;
-          arrivalStart = null;
-          exitStart = null;
-          ambientDisturbUntil = 0;
-          nextAmbientDisturbAt = 0;
-
-          try { chamberAudio.pause(); } catch (e) {}
-          chamberAudio.currentTime = 0;
-          vid.style.opacity = 0;
-          chamberVol = 0;
-        }
-      }
-
-      chamberVol = baseVol;
-    }
+    // keep chamber barely perceptible before arrival, then let it emerge slowly
+    const traceVol = !entered ? preMix * 0.035 : 0;
+    const wobble = Math.sin(T * 0.37) * 0.004;
+    const chamberVol = Math.max(traceVol, chamberMix * chamberTargetVolume + wobble);
 
     chamberAudio.volume = Math.max(0, Math.min(chamberTargetVolume, chamberVol));
+
+    // once chamber fully fades away on exit, reset state quietly
+    if (exitStart !== null && chamberMix <= 0.004) {
+      entered = false;
+      holding = false;
+      holdStart = null;
+      preArrivalStart = null;
+      arrivalStart = null;
+      exitStart = null;
+      chamberTargetMix = 0;
+      chamberMix = 0;
+      ambientDisturbUntil = 0;
+      nextAmbientDisturbAt = 0;
+
+      try { chamberAudio.pause(); } catch (e) {}
+      chamberAudio.currentTime = 0;
+      vid.style.opacity = 0;
+    }
   }
 
   requestAnimationFrame(loop);

@@ -30,3 +30,9 @@ V25 changes:
 - chamber audio fade-in is now truly gradual across the full 9 seconds
 - chamber audio fade-out now also dissolves gradually across 9 seconds
 - video presence now fades in/out more gradually to match the audio
+
+
+V26 changes:
+- chamber fade now uses a smooth mix value instead of abrupt state math
+- pre-arrival chamber/audio traces are much lower so the full arrival reads less like a jump
+- video fade follows the same smoother chamber mix
