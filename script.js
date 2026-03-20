@@ -115,7 +115,13 @@ function drawNoise(intensity) {
 }
 
 async function setupAudio() {
-  if (audioStarted) return;
+  if (audioStarted) {
+    if (audioCtx && audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
+    return;
+  }
+
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") {
     await audioCtx.resume();
@@ -125,14 +131,16 @@ async function setupAudio() {
   chamberEl.loop = true;
   splashEl.volume = 1;
   chamberEl.volume = 1;
+  splashEl.muted = false;
+  chamberEl.muted = false;
 
   masterGain = audioCtx.createGain();
   splashGain = audioCtx.createGain();
   chamberGain = audioCtx.createGain();
 
-  splashGain.gain.value = 0.0001;
-  chamberGain.gain.value = 0.0001;
-  masterGain.gain.value = 1;
+  splashGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  chamberGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  masterGain.gain.setValueAtTime(1, audioCtx.currentTime);
 
   splashSource = audioCtx.createMediaElementSource(splashEl);
   chamberSource = audioCtx.createMediaElementSource(chamberEl);
@@ -143,14 +151,11 @@ async function setupAudio() {
   chamberGain.connect(masterGain);
   masterGain.connect(audioCtx.destination);
 
+  // start both during the gesture so iPhone fully unlocks them
   try { await splashEl.play(); } catch (e) {}
-  try {
-    await chamberEl.play();
-    // keep chamber already running so fades are continuous
-    chamberEl.muted = false;
-  } catch (e) {}
+  try { await chamberEl.play(); } catch (e) {}
 
-  // randomize chamber start point so it feels already in progress
+  // chamber stays running silently in the background
   if (chamberEl.readyState >= 1) {
     try {
       if (chamberEl.duration && isFinite(chamberEl.duration) && chamberEl.duration > 0) {
@@ -167,20 +172,18 @@ async function setupAudio() {
     }, { once: true });
   }
 
-  // start splash audible, chamber buried
-  splashGain.gain.value = splashTargetVolume * 0.72;
-  chamberGain.gain.value = 0.0001;
+  splashGain.gain.setTargetAtTime(splashTargetVolume * 0.72, audioCtx.currentTime, 0.18);
+  chamberGain.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.18);
 
   audioStarted = true;
 }
 
-function startPress(e) {
+async function startPress(e) {
   if (e && e.cancelable) e.preventDefault();
   isPressing = true;
   targetProgress = 1;
-  setupAudio();
+  await setupAudio();
 
-  // start video early and keep it running continuously
   if (vid.paused) {
     if (vid.readyState >= 1) {
       try {
@@ -289,12 +292,13 @@ function loop(now) {
   }
 
   // true smooth audio via Web Audio
-  if (audioStarted && splashGain && chamberGain) {
+  if (audioStarted && splashGain && chamberGain && audioCtx) {
     const splashVol = Math.max(0.0001, splashTargetVolume * (0.72 - eased * 0.42));
     const chamberVol = Math.max(0.0001, chamberTargetVolume * eased);
 
-    splashGain.gain.value = splashVol;
-    chamberGain.gain.value = chamberVol;
+    const nowAudio = audioCtx.currentTime;
+    splashGain.gain.setTargetAtTime(splashVol, nowAudio, 0.12);
+    chamberGain.gain.setTargetAtTime(chamberVol, nowAudio, 0.12);
   }
 
   requestAnimationFrame(loop);

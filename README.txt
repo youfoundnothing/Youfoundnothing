@@ -51,3 +51,10 @@ V28 changes:
 - fades are fully reversible from whatever point they are at
 - video and audio both follow the same single progress value
 - chamber can be entered and left repeatedly without one-time state issues
+
+
+V29 changes:
+- audio startup is now awaited inside the press gesture for iPhone reliability
+- splash + chamber are both explicitly unlocked during the first press
+- audio uses AudioParam smoothing instead of direct gain.value writes
+- preload enabled on splash/chamber/video
