@@ -77,7 +77,21 @@ V34 changes:
 - chamber playback startup order simplified for better reliability
 
 
-V36 changes:
-- chamber starts at 0 volume on first tap
-- splash/chamber now use a slower crossfade curve over the 9-second transition
-- chamber should stay quieter earlier and emerge more gradually
+V37 changes:
+- rolled back the startup change that seemed to kill chamber audio on your phone
+- kept the 9-second transition
+- uses a gentler crossfade curve so chamber emerges more gradually without disappearing entirely
+
+
+V38 changes:
+- audio now unlocks on completed tap instead of while holding
+- tap commits you into the first chamber; no release-to-home behavior
+- chamber audio starts muted and fades up later/more gradually during the transition
+- splash and chamber now crossfade with staggered curves so chamber should not hit immediately
+
+
+V39 changes:
+- increased midtone visibility for mobile
+- slightly reduced blur, increased contrast/brightness
+- boosted noise layer for perceptibility
+- improved text legibility while keeping subdued tone

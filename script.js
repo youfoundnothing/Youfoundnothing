@@ -20,6 +20,7 @@ const transitionMs = 9000;
 const traceFloor = 0.025;
 
 let audioStarted = false;
+let mediaUnlocked = false;
 let entered = false;
 let lastFrame = performance.now();
 let driftImpulse = 0;
@@ -62,7 +63,6 @@ async function startMediaIfNeeded() {
   } catch (e) { console.error("chamber play failed", e); }
 
   splash.volume = 0.08;
-  chamber.volume = 0.0;
 
   if (vid.paused) {
     try {
@@ -230,9 +230,13 @@ function loop(now) {
   }
 
   if (audioStarted) {
-    const cross = Math.pow(progress, 1.35);
-    const splashVol = Math.max(0, splashTargetVolume * (1 - cross));
-    const chamberVol = Math.max(0, chamberTargetVolume * cross);
+    // chamber should not arrive immediately; delay its emergence and fade it up
+    const splashCross = Math.pow(progress, 1.05);
+    const chamberCross = Math.pow(Math.max(0, (progress - 0.18) / 0.82), 1.85);
+
+    const splashVol = Math.max(0, splashTargetVolume * (1 - splashCross));
+    const chamberVol = Math.max(0, chamberTargetVolume * chamberCross);
+
     splash.volume = Math.min(1, splashVol);
     chamber.volume = Math.min(1, chamberVol);
   }

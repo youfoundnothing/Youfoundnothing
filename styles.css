@@ -41,7 +41,7 @@ body {
   transform: translate(-50%, -50%);
   font-family: Georgia, serif;
   font-size: clamp(14px, 3.6vw, 23px);
-  color: rgba(108,108,108,.48);
+  color: rgba(132,132,132,.62);
   pointer-events: none;
   z-index: 3;
 }
