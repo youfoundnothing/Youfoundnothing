@@ -75,3 +75,9 @@ V34 changes:
 - chamber audio floor raised so first chamber is definitely audible
 - splash reduced slightly so chamber can come through more clearly
 - chamber playback startup order simplified for better reliability
+
+
+V36 changes:
+- chamber starts at 0 volume on first tap
+- splash/chamber now use a slower crossfade curve over the 9-second transition
+- chamber should stay quieter earlier and emerge more gradually

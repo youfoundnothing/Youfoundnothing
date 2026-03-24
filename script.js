@@ -62,6 +62,7 @@ async function startMediaIfNeeded() {
   } catch (e) { console.error("chamber play failed", e); }
 
   splash.volume = 0.08;
+  chamber.volume = 0.0;
 
   if (vid.paused) {
     try {
@@ -229,8 +230,9 @@ function loop(now) {
   }
 
   if (audioStarted) {
-    const splashVol = Math.max(0, splashTargetVolume * (1 - eased));
-    const chamberVol = chamberTargetVolume * eased;
+    const cross = Math.pow(progress, 1.35);
+    const splashVol = Math.max(0, splashTargetVolume * (1 - cross));
+    const chamberVol = Math.max(0, chamberTargetVolume * cross);
     splash.volume = Math.min(1, splashVol);
     chamber.volume = Math.min(1, chamberVol);
   }
