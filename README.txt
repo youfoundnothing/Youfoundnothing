@@ -95,3 +95,9 @@ V39 changes:
 - slightly reduced blur, increased contrast/brightness
 - boosted noise layer for perceptibility
 - improved text legibility while keeping subdued tone
+
+
+V41 changes:
+- audio unlock now retries on both press and release
+- mediaUnlocked is only set after playback actually starts
+- fixes the case where hold failed because unlock was marked before audio really started

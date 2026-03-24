@@ -21,6 +21,7 @@ const traceFloor = 0.025;
 
 let audioStarted = false;
 let mediaUnlocked = false;
+let unlockInFlight = false;
 let entered = false;
 let lastFrame = performance.now();
 let driftImpulse = 0;
@@ -44,25 +45,39 @@ function resize() {
 window.addEventListener("resize", resize);
 
 async function startMediaIfNeeded() {
-  if (audioStarted) return;
-  audioStarted = true;
+  if (audioStarted || unlockInFlight) return;
+  unlockInFlight = true;
 
   splash.muted = false;
   chamber.muted = false;
   splash.volume = 0.0;
   chamber.volume = 0.0;
 
-  try { 
+  let splashStartedOk = false;
+  let chamberStartedOk = false;
+
+  try {
     splash.currentTime = 0;
-    await splash.play(); 
+    await splash.play();
+    splashStartedOk = true;
   } catch (e) { console.error("splash play failed", e); }
 
   try {
-    chamber.currentTime = 0;
     await chamber.play();
+    try {
+      if (chamber.readyState >= 1 && chamber.duration && isFinite(chamber.duration) && chamber.duration > 0) {
+        chamber.currentTime = Math.random() * chamber.duration;
+      }
+    } catch (e) {}
+    chamberStartedOk = true;
   } catch (e) { console.error("chamber play failed", e); }
 
-  splash.volume = 0.08;
+  if (splashStartedOk || chamberStartedOk) {
+    audioStarted = true;
+    mediaUnlocked = true;
+    splash.volume = 0.08;
+    chamber.volume = 0.0;
+  }
 
   if (vid.paused) {
     try {
@@ -73,14 +88,30 @@ async function startMediaIfNeeded() {
     vid.playbackRate = 0.92;
     vid.play().catch(() => {});
   }
+
+  unlockInFlight = false;
 }
 
 function beginPress(e) {
-  if (entered) return;
   if (e && e.cancelable) e.preventDefault();
+  if (entered) return;
   targetProgress = 1;
-  entered = true;
-  startMediaIfNeeded();
+
+  // try immediately on press so hold can work
+  if (!mediaUnlocked && !unlockInFlight) {
+    startMediaIfNeeded();
+  }
+
+  // visual passage can begin immediately
+  if (vid.paused) {
+    try {
+      if (vid.readyState >= 1 && vid.duration && isFinite(vid.duration) && vid.duration > 0) {
+        vid.currentTime = Math.random() * vid.duration;
+      }
+    } catch (e) {}
+    vid.playbackRate = 0.92;
+    vid.play().catch(() => {});
+  }
 }
 
 function endPress(e) {}
