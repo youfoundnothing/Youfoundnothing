@@ -68,3 +68,10 @@ V31 changes:
 
 V32 changes:
 - transition progression changed from 9 seconds to 3 seconds
+
+
+V34 changes:
+- transition increased to 6 seconds
+- chamber audio floor raised so first chamber is definitely audible
+- splash reduced slightly so chamber can come through more clearly
+- chamber playback startup order simplified for better reliability

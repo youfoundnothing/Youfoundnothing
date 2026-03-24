@@ -16,7 +16,7 @@ let noiseData;
 
 let progress = 0;        // 0 = splash, 1 = chamber
 let targetProgress = 0;
-const transitionMs = 5000;
+const transitionMs = 6000;
 const traceFloor = 0.025;
 
 let audioStarted = false;
@@ -53,10 +53,12 @@ async function startMediaIfNeeded() {
 
   try { await splash.play(); } catch (e) { console.error("splash play failed", e); }
   try {
-    if (chamber.readyState >= 1 && chamber.duration && isFinite(chamber.duration) && chamber.duration > 0) {
-      chamber.currentTime = Math.random() * chamber.duration;
-    }
     await chamber.play();
+    try {
+      if (chamber.readyState >= 1 && chamber.duration && isFinite(chamber.duration) && chamber.duration > 0) {
+        chamber.currentTime = Math.random() * chamber.duration;
+      }
+    } catch (e) {}
   } catch (e) { console.error("chamber play failed", e); }
 
   splash.volume = 0.08;
@@ -227,8 +229,8 @@ function loop(now) {
   }
 
   if (audioStarted) {
-    const splashVol = Math.max(0, splashTargetVolume * (0.72 - eased * 0.42));
-    const chamberVol = Math.max(0.02, chamberTargetVolume * eased);
+    const splashVol = Math.max(0, splashTargetVolume * (0.62 - eased * 0.34));
+    const chamberVol = Math.max(0.12, chamberTargetVolume * eased);
     splash.volume = Math.min(1, splashVol);
     chamber.volume = Math.min(1, chamberVol);
   }
