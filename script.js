@@ -16,10 +16,11 @@ let noiseData;
 
 let progress = 0;        // 0 = splash, 1 = chamber
 let targetProgress = 0;
-const transitionMs = 3000;
+const transitionMs = 5000;
 const traceFloor = 0.025;
 
 let audioStarted = false;
+let entered = false;
 let lastFrame = performance.now();
 let driftImpulse = 0;
 let lastImpulse = 0;
@@ -72,15 +73,14 @@ async function startMediaIfNeeded() {
 }
 
 function beginPress(e) {
+  if (entered) return;
   if (e && e.cancelable) e.preventDefault();
   targetProgress = 1;
+  entered = true;
   startMediaIfNeeded();
 }
 
-function endPress(e) {
-  if (e && e.cancelable) e.preventDefault();
-  targetProgress = 0;
-}
+function endPress(e) {}
 
 document.addEventListener("contextmenu", e => e.preventDefault());
 document.body.addEventListener("pointerdown", beginPress, { passive: false });
@@ -228,7 +228,7 @@ function loop(now) {
 
   if (audioStarted) {
     const splashVol = Math.max(0, splashTargetVolume * (0.72 - eased * 0.42));
-    const chamberVol = Math.max(0, chamberTargetVolume * eased);
+    const chamberVol = Math.max(0.02, chamberTargetVolume * eased);
     splash.volume = Math.min(1, splashVol);
     chamber.volume = Math.min(1, chamberVol);
   }
