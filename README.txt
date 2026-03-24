@@ -58,3 +58,13 @@ V29 changes:
 - splash + chamber are both explicitly unlocked during the first press
 - audio uses AudioParam smoothing instead of direct gain.value writes
 - preload enabled on splash/chamber/video
+
+
+V31 changes:
+- reverted to simpler direct HTML audio playback so sound should be audible again
+- keeps the v28 on/off-switch behavior
+- includes homepage refinement pass: more visibility, living text, subtle touch gravity
+
+
+V32 changes:
+- transition progression changed from 9 seconds to 3 seconds
