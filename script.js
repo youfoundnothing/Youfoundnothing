@@ -15,17 +15,21 @@ chamberAudio.src = "audio.mp3";
 let w = 0, h = 0;
 let noiseData;
 
-let stage = 0; // 0=landing, 1=woken, 2=transitioning/chamber
-let transitionProgress = 0; // second press transition only
+let stage = 0; // 0=landing, 1=woken splash, 2=transition/chamber
+let transitionProgress = 0;
 const transitionMs = 9000;
 
 let audioReady = false;
 let driftImpulse = 0;
 let lastImpulse = 0;
+let touchPulse = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
-let touchPulse = 0;
 let lastFrame = performance.now();
+let chamberPrimed = false;
+
+// prevent iPhone double-fire from pointer + touch on one tap
+let lastPressAt = 0;
 
 const splashTargetVolume = 0.42;
 const chamberTargetVolume = 0.58;
@@ -57,23 +61,28 @@ async function prepareAudio() {
     console.error("splash play failed", e);
   }
 
+  // Prime chamber on first interaction so second press can fade it in smoothly.
   try {
     await chamberAudio.play();
-    try {
-      if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
-        chamberAudio.currentTime = Math.random() * chamberAudio.duration;
-      }
-    } catch (e) {}
+    if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
+      chamberAudio.currentTime = Math.random() * chamberAudio.duration;
+    }
+    chamberAudio.volume = 0;
+    chamberPrimed = true;
   } catch (e) {
     console.error("chamber play failed", e);
+    chamberPrimed = false;
   }
-
-  chamberAudio.volume = 0;
 }
 
 async function onPress(e) {
   if (e && e.cancelable) e.preventDefault();
 
+  const now = performance.now();
+  if (now - lastPressAt < 350) return;
+  lastPressAt = now;
+
+  // First press: wake splash only
   if (stage === 0) {
     stage = 1;
     touchPulse = 1;
@@ -82,9 +91,23 @@ async function onPress(e) {
     return;
   }
 
+  // Second press: begin chamber transition
   if (stage === 1) {
     stage = 2;
     touchPulse = 1;
+
+    // Retry chamber start here if priming failed earlier.
+    if (!chamberPrimed) {
+      try {
+        await chamberAudio.play();
+        if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
+          chamberAudio.currentTime = Math.random() * chamberAudio.duration;
+        }
+        chamberPrimed = true;
+      } catch (e) {
+        console.error("second press chamber play failed", e);
+      }
+    }
 
     if (video.paused) {
       try {
@@ -95,13 +118,13 @@ async function onPress(e) {
       video.playbackRate = 0.92;
       video.play().catch(() => {});
     }
-    return;
   }
 }
 
 document.addEventListener("contextmenu", e => e.preventDefault());
+
+// Use only pointerdown to avoid duplicate tap handling.
 document.body.addEventListener("pointerdown", onPress, { passive: false });
-document.body.addEventListener("touchstart", onPress, { passive: false });
 
 function drawField(T, wakeMix, chamberMix) {
   bctx.fillStyle = "rgb(10,10,10)";
@@ -121,7 +144,6 @@ function drawField(T, wakeMix, chamberMix) {
     const r = Math.max(w, h) * m[2] * (1 + Math.sin(T * (0.12 + i * 0.02) + i) * (0.09 + wakeMix * 0.05 + chamberMix * 0.04));
 
     const core = Math.min(240, m[3] + wakeMix * 22 + chamberMix * 16);
-
     const grad = bctx.createRadialGradient(x, y, 0, x, y, r);
     grad.addColorStop(0, `rgba(${core}, ${core - 8}, ${core - 8}, ${0.19 + wakeMix * 0.07 + chamberMix * 0.03})`);
     grad.addColorStop(0.34, `rgba(${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${0.15 + wakeMix * 0.03})`);

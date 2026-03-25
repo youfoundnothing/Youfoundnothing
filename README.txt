@@ -13,3 +13,10 @@ Root files expected beside index.html:
 - splash.mp3
 - audio.mp3
 - video.mp4
+
+
+V45 changes:
+- fixes accidental first-tap chamber entry caused by duplicate mobile tap events
+- now uses pointerdown only with debounce
+- first press only wakes splash visuals/audio
+- second press begins chamber transition and chamber audio
