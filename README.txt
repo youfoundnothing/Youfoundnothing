@@ -20,3 +20,10 @@ V45 changes:
 - now uses pointerdown only with debounce
 - first press only wakes splash visuals/audio
 - second press begins chamber transition and chamber audio
+
+
+V46 changes:
+- stages now advance only on completed press/release cycles
+- first completed press wakes splash only
+- second completed press begins chamber transition
+- chamber audio is primed on first press and faded in on second
