@@ -1,12 +1,12 @@
-YOU FOUND NOTHING — V1
+YOU FOUND NOTHING — MOBILE V1
 
-Interaction model:
-- tap or hold, then release once: wake splash + splash audio only
-- tap or hold, then release a second time: chamber entrance + chamber audio + video
-- taps inside chamber are reserved for moving to future chambers
-- holds inside chamber intensify the current chamber instead of navigating
+Optimized mobile interaction:
+- Tap 1: wake splash + splash audio
+- Tap 2: enter chamber 1
+- Tap in chamber: move to next chamber (infrastructure ready)
+- Hold in chamber: intensify current chamber
 
 Files expected beside index.html:
-- splash.mp3 (one-shot)
-- audio.mp3 (chamber loop)
-- video.mp4 (chamber loop)
+- splash.mp3
+- audio.mp3
+- video.mp4
