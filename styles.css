@@ -4,6 +4,7 @@ html, body {
   background: #000;
   overflow: hidden;
 }
+
 body {
   -webkit-user-select: none;
   user-select: none;
@@ -13,47 +14,70 @@ body {
   overscroll-behavior: none;
   position: relative;
 }
+
 #bg, #noise, #video {
   position: absolute;
   width: 100%;
   height: 100%;
   inset: 0;
 }
+
 #bg {
-  filter: blur(8px) contrast(140%) brightness(1.40) saturate(0.74);
+  filter: blur(7px) contrast(165%) brightness(1.95) saturate(0.82);
 }
+
 #noise {
   pointer-events: none;
-  opacity: .14;
+  opacity: .26;
   mix-blend-mode: screen;
 }
+
 #video {
   object-fit: cover;
   object-position: center center;
   opacity: 0;
-  filter: blur(2.4px) contrast(108%) brightness(.84) saturate(.78);
+  filter: blur(2.6px) contrast(110%) brightness(.88) saturate(.78);
   transition: none;
 }
+
 #wrap {
   position: absolute;
   left: 48%;
   top: 61%;
   transform: translate(-50%, -50%);
   font-family: Georgia, serif;
-  font-size: clamp(14px, 3.6vw, 23px);
-  color: rgba(132,132,132,.62);
+  font-size: clamp(16px, 4.4vw, 28px);
+  color: rgba(148,148,148,.72);
   pointer-events: none;
   z-index: 3;
 }
-#text {
-  opacity: .42;
-  letter-spacing: .028em;
-  filter: blur(.72px);
-  transition: opacity .12s linear, filter .12s linear;
+
+.stack {
   white-space: normal;
-  line-height: 0.95;
+  line-height: 0.96;
   display: inline-block;
+  letter-spacing: .028em;
+  filter: blur(.58px);
 }
-#text span {
+
+.stack span {
   display: block;
+}
+
+#text {
+  opacity: .78;
+}
+
+.chamber-meta {
+  position: absolute;
+  left: 50%;
+  bottom: 8.5%;
+  transform: translateX(-50%);
+  font-family: Georgia, serif;
+  font-size: clamp(14px, 3.6vw, 23px);
+  color: rgba(160,160,160,.78);
+  text-align: center;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
 }

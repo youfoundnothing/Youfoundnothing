@@ -2,140 +2,108 @@ const bg = document.getElementById("bg");
 const bctx = bg.getContext("2d");
 const noise = document.getElementById("noise");
 const nctx = noise.getContext("2d");
-const t = document.getElementById("text");
-const vid = document.getElementById("video");
-const splash = document.getElementById("splashAudio");
-const chamber = document.getElementById("chamberAudio");
+const text = document.getElementById("text");
+const chamberTitle = document.getElementById("chamberTitle");
+const video = document.getElementById("video");
+const splashAudio = document.getElementById("splashAudio");
+const chamberAudio = document.getElementById("chamberAudio");
 
-vid.src = "video.mp4";
-splash.src = "splash.mp3";
-chamber.src = "audio.mp3";
+video.src = "video.mp4";
+splashAudio.src = "splash.mp3";
+chamberAudio.src = "audio.mp3";
 
 let w = 0, h = 0;
 let noiseData;
 
-let progress = 0;        // 0 = splash, 1 = chamber
-let targetProgress = 0;
+let stage = 0; // 0=landing, 1=woken, 2=transitioning/chamber
+let transitionProgress = 0; // second press transition only
 const transitionMs = 9000;
-const traceFloor = 0.025;
 
-let audioStarted = false;
-let mediaUnlocked = false;
-let unlockInFlight = false;
-let pressCount = 0;
-let firstPressActive = false;
-let entered = false;
-let lastFrame = performance.now();
+let audioReady = false;
 let driftImpulse = 0;
 let lastImpulse = 0;
-let touchInfluence = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
+let touchPulse = 0;
+let lastFrame = performance.now();
 
-const splashTargetVolume = 0.52;
-const chamberTargetVolume = 0.56;
+const splashTargetVolume = 0.42;
+const chamberTargetVolume = 0.58;
 
 function resize() {
-  w = window.innerWidth;
-  h = window.innerHeight;
+  w = innerWidth;
+  h = innerHeight;
   bg.width = w;
   bg.height = h;
   noise.width = w;
   noise.height = h;
   noiseData = nctx.createImageData(w, h);
 }
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 
-async function startMediaIfNeeded() {
-  if (audioStarted || unlockInFlight) return;
-  unlockInFlight = true;
+async function prepareAudio() {
+  if (audioReady) return;
+  audioReady = true;
 
-  splash.muted = false;
-  chamber.muted = false;
-  splash.volume = 0.0;
-  chamber.volume = 0.0;
-
-  let splashStartedOk = false;
-  let chamberStartedOk = false;
+  splashAudio.muted = false;
+  chamberAudio.muted = false;
+  splashAudio.volume = 0;
+  chamberAudio.volume = 0;
 
   try {
-    splash.currentTime = 0;
-    await splash.play();
-    splashStartedOk = true;
-  } catch (e) { console.error("splash play failed", e); }
+    splashAudio.currentTime = 0;
+    await splashAudio.play();
+  } catch (e) {
+    console.error("splash play failed", e);
+  }
 
   try {
-    await chamber.play();
+    await chamberAudio.play();
     try {
-      if (chamber.readyState >= 1 && chamber.duration && isFinite(chamber.duration) && chamber.duration > 0) {
-        chamber.currentTime = Math.random() * chamber.duration;
+      if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
+        chamberAudio.currentTime = Math.random() * chamberAudio.duration;
       }
     } catch (e) {}
-    chamberStartedOk = true;
-  } catch (e) { console.error("chamber play failed", e); }
-
-  if (splashStartedOk || chamberStartedOk) {
-    audioStarted = true;
-    mediaUnlocked = true;
-    splash.volume = 0.08;
-    chamber.volume = 0.0;
+  } catch (e) {
+    console.error("chamber play failed", e);
   }
 
-  if (vid.paused) {
-    try {
-      if (vid.readyState >= 1 && vid.duration && isFinite(vid.duration) && vid.duration > 0) {
-        vid.currentTime = Math.random() * vid.duration;
-      }
-    } catch (e) {}
-    vid.playbackRate = 0.92;
-    vid.play().catch(() => {});
-  }
-
-  unlockInFlight = false;
+  chamberAudio.volume = 0;
 }
 
-function beginPress(e) {
+async function onPress(e) {
   if (e && e.cancelable) e.preventDefault();
 
-  if (pressCount === 0) {
-    pressCount = 1;
-    firstPressActive = true;
-
-    if (!mediaUnlocked && !unlockInFlight) {
-      startMediaIfNeeded();
-    }
+  if (stage === 0) {
+    stage = 1;
+    touchPulse = 1;
+    await prepareAudio();
+    splashAudio.volume = splashTargetVolume * 0.55;
     return;
   }
 
-  if (!mediaUnlocked && !unlockInFlight) {
-    startMediaIfNeeded();
-  }
+  if (stage === 1) {
+    stage = 2;
+    touchPulse = 1;
 
-  targetProgress = 1;
-
-  if (vid.paused) {
-    try {
-      if (vid.readyState >= 1 && vid.duration && isFinite(vid.duration) && vid.duration > 0) {
-        vid.currentTime = Math.random() * vid.duration;
-      }
-    } catch (e) {}
-    vid.playbackRate = 0.92;
-    vid.play().catch(() => {});
+    if (video.paused) {
+      try {
+        if (video.readyState >= 1 && video.duration && isFinite(video.duration) && video.duration > 0) {
+          video.currentTime = Math.random() * video.duration;
+        }
+      } catch (e) {}
+      video.playbackRate = 0.92;
+      video.play().catch(() => {});
+    }
+    return;
   }
 }
 
-function endPress(e) {}
-
 document.addEventListener("contextmenu", e => e.preventDefault());
-document.body.addEventListener("pointerdown", beginPress, { passive: false });
-document.body.addEventListener("pointerup", endPress, { passive: false });
-document.body.addEventListener("pointercancel", endPress, { passive: false });
-document.body.addEventListener("pointerleave", endPress, { passive: false });
-document.body.addEventListener("touchstart", beginPress, { passive: false });
-document.body.addEventListener("touchend", endPress, { passive: false });
-document.body.addEventListener("touchcancel", endPress, { passive: false });
+document.body.addEventListener("pointerdown", onPress, { passive: false });
+document.body.addEventListener("touchstart", onPress, { passive: false });
 
-function drawField(T) {
+function drawField(T, wakeMix, chamberMix) {
   bctx.fillStyle = "rgb(10,10,10)";
   bctx.fillRect(0, 0, w, h);
 
@@ -148,13 +116,15 @@ function drawField(T) {
 
   for (let i = 0; i < masses.length; i++) {
     const m = masses[i];
-    const x = w * m[0] + Math.sin(T * (0.08 + i * 0.02) + i) * w * 0.045;
-    const y = h * m[1] + Math.cos(T * (0.06 + i * 0.015) + i * 0.8) * h * 0.04;
-    const r = Math.max(w, h) * m[2] * (1 + Math.sin(T * (0.12 + i * 0.02) + i) * 0.09);
+    const x = w * m[0] + Math.sin(T * (0.08 + i * 0.02) + i) * w * (0.045 + wakeMix * 0.01 + chamberMix * 0.01);
+    const y = h * m[1] + Math.cos(T * (0.06 + i * 0.015) + i * 0.8) * h * (0.04 + wakeMix * 0.008 + chamberMix * 0.01);
+    const r = Math.max(w, h) * m[2] * (1 + Math.sin(T * (0.12 + i * 0.02) + i) * (0.09 + wakeMix * 0.05 + chamberMix * 0.04));
+
+    const core = Math.min(240, m[3] + wakeMix * 22 + chamberMix * 16);
 
     const grad = bctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, `rgba(${m[3]}, ${m[3]}, ${m[3]}, 0.15)`);
-    grad.addColorStop(0.32, `rgba(${Math.max(40, m[3]-75)}, ${Math.max(40, m[3]-75)}, ${Math.max(40, m[3]-75)}, 0.12)`);
+    grad.addColorStop(0, `rgba(${core}, ${core - 8}, ${core - 8}, ${0.19 + wakeMix * 0.07 + chamberMix * 0.03})`);
+    grad.addColorStop(0.34, `rgba(${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${0.15 + wakeMix * 0.03})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     bctx.fillStyle = grad;
     bctx.beginPath();
@@ -164,10 +134,10 @@ function drawField(T) {
 
   const gx = w * (0.5 + Math.sin(T * 0.05) * 0.028);
   const gy = h * (0.54 + Math.cos(T * 0.045) * 0.025);
-  const gr = Math.max(w, h) * 0.44;
+  const gr = Math.max(w, h) * (0.44 + wakeMix * 0.02 + chamberMix * 0.01);
   const redGlow = bctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-  redGlow.addColorStop(0, "rgba(108, 14, 14, 0.08)");
-  redGlow.addColorStop(0.46, "rgba(54, 8, 8, 0.04)");
+  redGlow.addColorStop(0, `rgba(118, 18, 18, ${0.10 + wakeMix * 0.05})`);
+  redGlow.addColorStop(0.46, `rgba(54, 8, 8, ${0.05 + wakeMix * 0.02})`);
   redGlow.addColorStop(1, "rgba(0,0,0,0)");
   bctx.fillStyle = redGlow;
   bctx.fillRect(0, 0, w, h);
@@ -177,7 +147,7 @@ function drawField(T) {
     const y = h * (0.33 + i * 0.16) + Math.cos(T * (0.09 + i * 0.02) + i) * h * 0.04;
     const r = Math.max(w, h) * (0.12 + i * 0.025);
     const grad = bctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, "rgba(230,230,230,0.035)");
+    grad.addColorStop(0, `rgba(235,235,235,${0.045 + wakeMix * 0.015})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     bctx.fillStyle = grad;
     bctx.beginPath();
@@ -193,95 +163,100 @@ function drawNoise(intensity) {
     noiseData.data[i] = v;
     noiseData.data[i + 1] = v;
     noiseData.data[i + 2] = v;
-    noiseData.data[i + 3] = Math.random() * 22 * intensity;
+    noiseData.data[i + 3] = Math.random() * 24 * intensity;
   }
   nctx.putImageData(noiseData, 0, 0);
 }
 
 function loop(now) {
   const T = now * 0.001;
-  const dtMs = Math.max(1, now - lastFrame);
+  const dt = Math.max(1, now - lastFrame);
   lastFrame = now;
 
-  if (now - lastImpulse > 2600 + Math.random() * 3200) {
-    driftImpulse = (Math.random() - .5) * .42;
+  if (now - lastImpulse > 2200 + Math.random() * 2600) {
+    driftImpulse = (Math.random() - .5) * .55;
     lastImpulse = now;
   }
-  driftImpulse *= .965;
+  driftImpulse *= .968;
 
-  const step = dtMs / transitionMs;
-  if (targetProgress > progress) {
-    progress = Math.min(targetProgress, progress + step);
-  } else if (targetProgress < progress) {
-    progress = Math.max(targetProgress, progress - step);
+  if (stage === 2 && transitionProgress < 1) {
+    transitionProgress = Math.min(1, transitionProgress + dt / transitionMs);
   }
 
-  const wake = firstPressActive ? 1 : 0;
-
-  if (targetProgress > 0 || firstPressActive) {
-    touchInfluence = Math.min(1, touchInfluence + 0.02);
-  } else {
-    touchInfluence = Math.max(0, touchInfluence - 0.02);
+  if (touchPulse > 0) {
+    touchPulse = Math.max(0, touchPulse - 0.022);
   }
 
-  const eased = 1 - Math.pow(1 - progress, 2.2);
-  const visibleMix = Math.max(progress > 0 ? traceFloor : 0, eased);
+  const wakeBase = stage >= 1 ? 1 : 0;
+  const wakeMix = Math.max(wakeBase * 0.65, touchPulse);
+  const chamberMix = 1 - Math.pow(1 - transitionProgress, 2.15);
 
-  if (progress > 0.7 && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
-    ambientDisturbUntil = now + 1000 + Math.random() * 700;
-    nextAmbientDisturbAt = now + 20000 + Math.random() * 26000;
+  if (stage === 2 && transitionProgress > 0.55 && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
+    ambientDisturbUntil = now + 900 + Math.random() * 800;
+    nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
   }
 
-  let intensity = 1.25 + eased * 4.2 + wake * 1.0;
+  let intensity = 1.35 + wakeMix * 1.4 + chamberMix * 3.8;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
   }
 
-  drawField(T);
+  drawField(T, wakeMix, chamberMix);
   drawNoise(intensity);
 
-  const dx = Math.sin(T * .19) * (.16 + touchInfluence * 0.12) + driftImpulse;
-  const dy = Math.cos(T * .17) * (.22 + touchInfluence * 0.12) + driftImpulse * .42;
-  const scaleY = 1 - eased * .05 - wake * 0.01;
-  const scaleX = 1 - eased * .01;
-  const microWarp = Math.sin(T * 0.6) * 0.002 + Math.cos(T * 0.4) * 0.002;
-  const textDx = dx * (1 - eased * .10);
-  const textDy = dy * (1 - eased * .08);
-  const baseOpacity = Math.max(0.04, 0.42 + wake * 0.08 - eased * 0.38);
-  const flicker = Math.sin(T * 1.7) * 0.015;
+  const dx = Math.sin(T * .19) * (.18 + wakeMix * 0.14 + chamberMix * 0.10) + driftImpulse;
+  const dy = Math.cos(T * .17) * (.24 + wakeMix * 0.12 + chamberMix * 0.10) + driftImpulse * .42;
+  const scaleY = 1 - chamberMix * .05 - wakeMix * 0.01;
+  const scaleX = 1 - chamberMix * .01;
+  const microWarp = Math.sin(T * 0.6) * (0.18 + wakeMix * 0.20) + Math.cos(T * 0.4) * (0.16 + wakeMix * 0.18);
+  const textDx = dx * (1 - chamberMix * .10);
+  const textDy = dy * (1 - chamberMix * .08);
+  const baseOpacity = Math.max(0.08, 0.78 + wakeMix * 0.10 - chamberMix * 0.52);
+  const flicker = Math.sin(T * (1.7 + wakeMix * 0.9)) * (0.015 + wakeMix * 0.02);
 
-  t.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY}) skewX(${microWarp}deg)`;
-  t.style.letterSpacing = `${0.028 - eased * 0.008}em`;
-  t.style.opacity = `${Math.max(0.04, baseOpacity + flicker)}`;
-  t.style.filter = `blur(${0.72 + eased * 0.32}px)`;
+  text.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY}) skewX(${microWarp}deg)`;
+  text.style.letterSpacing = `${0.028 - chamberMix * 0.008 + wakeMix * 0.004}em`;
+  text.style.opacity = `${Math.max(0.06, baseOpacity + flicker)}`;
+  text.style.filter = `blur(${0.55 + chamberMix * 0.42 + wakeMix * 0.05}px)`;
 
-  let brightness = 1 + wake * 0.05 - eased * 0.08;
+  let brightness = 1 + wakeMix * 0.08 - chamberMix * 0.06;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     brightness -= left * 0.035;
   }
   document.body.style.filter = `brightness(${brightness})`;
 
-  if ((!vid.paused || progress > 0.001) && pressCount >= 2) {
-    const videoOpacity = 0.03 + visibleMix * 0.82 + Math.sin(T * 0.19) * 0.008;
-    vid.style.opacity = Math.max(0, Math.min(0.86, videoOpacity)).toFixed(3);
+  if (!video.paused || chamberMix > 0.001) {
+    const videoMix = Math.max(0, Math.pow(Math.max(0, (transitionProgress - 0.14) / 0.86), 1.2));
+    const videoOpacity = 0.02 + videoMix * 0.84 + Math.sin(T * 0.19) * 0.007;
+    video.style.opacity = Math.max(0, Math.min(0.88, videoOpacity)).toFixed(3);
 
-    const videoBrightness = 0.89 + Math.sin(T * 0.12 + 0.8) * 0.018;
+    const videoBrightness = 0.90 + Math.sin(T * 0.12 + 0.8) * 0.018;
     const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
-    vid.style.filter = `blur(${2.5 - visibleMix * 0.75}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
+    video.style.filter = `blur(${2.6 - videoMix * 0.9}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
   }
 
-  if (audioStarted) {
-    // chamber should not arrive immediately; delay its emergence and fade it up
-    const splashCross = Math.pow(progress, 1.05);
-    const chamberCross = Math.pow(Math.max(0, (progress - 0.18) / 0.82), 1.85);
+  chamberTitle.style.opacity = `${Math.max(0, Math.min(0.92, (transitionProgress - 0.18) / 0.50))}`;
+  const metaShake = Math.sin(T * 0.9) * 0.6;
+  chamberTitle.style.transform = `translateX(-50%) translateY(${metaShake}px)`;
 
-    const splashVol = Math.max(0, splashTargetVolume * (1 - splashCross));
-    const chamberVol = Math.max(0, chamberTargetVolume * chamberCross);
+  if (audioReady) {
+    let splashVol = 0;
+    let chamberVol = 0;
 
-    splash.volume = Math.min(1, splashVol);
-    chamber.volume = Math.min(1, chamberVol);
+    if (stage === 1) {
+      splashVol = splashTargetVolume * (0.42 + wakeMix * 0.5);
+      chamberVol = 0;
+    } else if (stage === 2) {
+      const cross = Math.pow(transitionProgress, 1.08);
+      const chamberCross = Math.pow(Math.max(0, (transitionProgress - 0.10) / 0.90), 1.65);
+      splashVol = Math.max(0, splashTargetVolume * (1 - cross));
+      chamberVol = Math.max(0, chamberTargetVolume * chamberCross);
+    }
+
+    splashAudio.volume = Math.min(1, splashVol);
+    chamberAudio.volume = Math.min(1, chamberVol);
   }
 
   requestAnimationFrame(loop);
