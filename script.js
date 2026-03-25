@@ -12,6 +12,7 @@ const chamberAudio = document.getElementById("chamberAudio");
 
 const CHAMBERS = [
   {
+    slug: "traffic-court",
     title1: "Traffic Court",
     title2: ".. 33310",
     audio: "audio-1.mp3",
@@ -19,20 +20,22 @@ const CHAMBERS = [
     visual: 1.00
   },
   {
-    title1: "Somewhere Else",
-    title2: ".. Side B",
+    slug: "holding-pattern",
+    title1: "Holding Pattern",
+    title2: ".. 00002",
     audio: "audio-2.mp3",
     video: "video-2.mp4",
     visual: 1.18
   },
   {
-    title1: "Frogman",
-    title2: ".. Blockchain",
+    slug: "no-appeal",
+    title1: "No Appeal",
+    title2: ".. 00003",
     audio: "audio-3.mp3",
     video: "video-3.mp4",
     visual: 1.36
   }
-]
+];
 
 const ENTRY_DURATION_MS = 9000;
 const HOLD_THRESHOLD_MS = 420;
@@ -43,10 +46,6 @@ let noiseData;
 let appState = "landing"; // landing, woken, entering, chamber
 let activeChamber = 0;
 let entryProgress = 0;
-
-function chamberVisualFactor() {
-  return CHAMBERS[activeChamber]?.visual ?? 1;
-}
 
 let splashStarted = false;
 let chamberStarted = false;
@@ -82,6 +81,29 @@ function resize() {
   noiseData = nctx.createImageData(w, h);
 }
 addEventListener("resize", resize);
+
+function getFeaturedSlugFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("chamber") || params.get("featured");
+  if (fromQuery) return fromQuery.trim().toLowerCase();
+
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  if (!path) return null;
+  const parts = path.split("/");
+  const last = parts[parts.length - 1];
+  if (!last || last.toLowerCase() === "index.html") return null;
+  return decodeURIComponent(last).trim().toLowerCase();
+}
+
+function chamberIndexBySlug(slug) {
+  if (!slug) return 0;
+  const idx = CHAMBERS.findIndex(c => c.slug === slug);
+  return idx >= 0 ? idx : 0;
+}
+
+function chamberVisualFactor() {
+  return CHAMBERS[activeChamber]?.visual ?? 1;
+}
 
 function setChamber(index) {
   const c = CHAMBERS[index];
@@ -421,5 +443,5 @@ function loop(now) {
 }
 
 resize();
-setChamber(0);
+setChamber(chamberIndexBySlug(getFeaturedSlugFromURL()));
 requestAnimationFrame(loop);
