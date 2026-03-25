@@ -22,6 +22,7 @@ const transitionMs = 9000;
 let splashReady = false;
 let chamberStarted = false;
 let pointerIsDown = false;
+let activePointerId = null;
 let pressVisual = 0;
 let wakeLevel = 0;
 let driftImpulse = 0;
@@ -29,6 +30,10 @@ let lastImpulse = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
 let lastFrame = performance.now();
+
+// hard gate so one quick tap can never count as both first and second press
+let stageCooldownUntil = 0;
+const interStageCooldownMs = 700;
 
 const splashTargetVolume = 0.42;
 const chamberTargetVolume = 0.58;
@@ -90,27 +95,38 @@ function onPointerDown(e) {
   if (e && e.cancelable) e.preventDefault();
   if (pointerIsDown) return;
   pointerIsDown = true;
+  activePointerId = e.pointerId ?? "mouse";
   pressVisual = 1;
 }
 
 async function onPointerUp(e) {
   if (e && e.cancelable) e.preventDefault();
-  if (!pointerIsDown) return;
-  pointerIsDown = false;
+  const pid = e.pointerId ?? "mouse";
+  if (!pointerIsDown || activePointerId !== pid) return;
 
-  // first completed press = splash only
+  pointerIsDown = false;
+  activePointerId = null;
+
+  const now = performance.now();
+  if (now < stageCooldownUntil) {
+    return;
+  }
+
+  // First completed press = splash only
   if (stage === 0) {
     stage = 1;
     wakeLevel = 1;
+    stageCooldownUntil = now + interStageCooldownMs;
     await startSplashIfNeeded();
     splashAudio.volume = splashTargetVolume * 0.55;
     chamberAudio.volume = 0;
     return;
   }
 
-  // second completed press = chamber starts now
+  // Second completed press = chamber begins
   if (stage === 1) {
     stage = 2;
+    stageCooldownUntil = now + interStageCooldownMs;
     await startSplashIfNeeded();
     await startChamberIfNeeded();
     await startVideoIfNeeded();

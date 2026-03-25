@@ -40,3 +40,10 @@ V47 changes:
 - chamber audio no longer starts on first press; it only starts on the second completed press
 - first completed press starts only splash audio and wake visuals
 - second completed press starts chamber audio/video and transition
+
+
+V48 changes:
+- added a hard cooldown between first and second completed presses
+- one quick tap can no longer be interpreted as both wake + chamber
+- first completed press still starts only splash audio
+- second completed press starts chamber transition/audio/video
