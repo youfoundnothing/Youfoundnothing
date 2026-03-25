@@ -20,18 +20,16 @@ let transitionProgress = 0;
 const transitionMs = 9000;
 
 let audioReady = false;
-let chamberPrimed = false;
 let driftImpulse = 0;
 let lastImpulse = 0;
 let touchPulse = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
 let lastFrame = performance.now();
+let chamberPrimed = false;
 
-// interaction state: only RELEASE advances stages
-let pointerIsDown = false;
-let pointerDownAt = 0;
-let releaseDebounceAt = 0;
+// prevent iPhone double-fire from pointer + touch on one tap
+let lastPressAt = 0;
 
 const splashTargetVolume = 0.42;
 const chamberTargetVolume = 0.58;
@@ -63,7 +61,7 @@ async function prepareAudio() {
     console.error("splash play failed", e);
   }
 
-  // Prime chamber during first completed interaction so second completed interaction can fade it in.
+  // Prime chamber on first interaction so second press can fade it in smoothly.
   try {
     await chamberAudio.play();
     if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
@@ -77,37 +75,28 @@ async function prepareAudio() {
   }
 }
 
-function onPressStart(e) {
+async function onPress(e) {
   if (e && e.cancelable) e.preventDefault();
-  pointerIsDown = true;
-  pointerDownAt = performance.now();
-  touchPulse = 1; // purely visual nudge while pressing; does NOT change stage
-}
-
-async function onPressEnd(e) {
-  if (e && e.cancelable) e.preventDefault();
-  if (!pointerIsDown) return;
-  pointerIsDown = false;
 
   const now = performance.now();
-  if (now - releaseDebounceAt < 300) return;
-  releaseDebounceAt = now;
+  if (now - lastPressAt < 350) return;
+  lastPressAt = now;
 
-  // First completed press: wake splash only
+  // First press: wake splash only
   if (stage === 0) {
     stage = 1;
     touchPulse = 1;
     await prepareAudio();
     splashAudio.volume = splashTargetVolume * 0.55;
-    chamberAudio.volume = 0;
     return;
   }
 
-  // Second completed press: begin chamber transition
+  // Second press: begin chamber transition
   if (stage === 1) {
     stage = 2;
     touchPulse = 1;
 
+    // Retry chamber start here if priming failed earlier.
     if (!chamberPrimed) {
       try {
         await chamberAudio.play();
@@ -133,9 +122,9 @@ async function onPressEnd(e) {
 }
 
 document.addEventListener("contextmenu", e => e.preventDefault());
-document.body.addEventListener("pointerdown", onPressStart, { passive: false });
-document.body.addEventListener("pointerup", onPressEnd, { passive: false });
-document.body.addEventListener("pointercancel", onPressEnd, { passive: false });
+
+// Use only pointerdown to avoid duplicate tap handling.
+document.body.addEventListener("pointerdown", onPress, { passive: false });
 
 function drawField(T, wakeMix, chamberMix) {
   bctx.fillStyle = "rgb(10,10,10)";
