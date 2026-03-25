@@ -21,16 +21,16 @@ const CHAMBERS = [
   },
   {
     slug: "holding-pattern",
-    title1: "Holding Pattern",
-    title2: ".. 00002",
+    title1: "Somewhere Else",
+    title2: ".. Side B",
     audio: "audio-2.mp3",
     video: "video-2.mp4",
     visual: 1.18
   },
   {
-    slug: "no-appeal",
-    title1: "No Appeal",
-    title2: ".. 00003",
+    slug: "frogman",
+    title1: "Frogman",
+    title2: ".. Blockchain",
     audio: "audio-3.mp3",
     video: "video-3.mp4",
     visual: 1.36
