@@ -47,3 +47,10 @@ V48 changes:
 - one quick tap can no longer be interpreted as both wake + chamber
 - first completed press still starts only splash audio
 - second completed press starts chamber transition/audio/video
+
+
+V49 changes:
+- holding now previews audio as well as visuals
+- first hold previews splash audio before first completed press
+- second hold previews chamber subtly before second completed press
+- completed presses still control stage changes
