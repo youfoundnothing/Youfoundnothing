@@ -11,8 +11,28 @@ const splashAudio = document.getElementById("splashAudio");
 const chamberAudio = document.getElementById("chamberAudio");
 
 const CHAMBERS = [
-  { title1: "Traffic Court", title2: ".. 33310", audio: "audio.mp3", video: "video.mp4" }
-];
+  {
+    title1: "Traffic Court",
+    title2: ".. 33310",
+    audio: "audio-1.mp3",
+    video: "video-1.mp4",
+    visual: 1.00
+  },
+  {
+    title1: "Holding Pattern",
+    title2: ".. 00002",
+    audio: "audio-2.mp3",
+    video: "video-2.mp4",
+    visual: 1.18
+  },
+  {
+    title1: "No Appeal",
+    title2: ".. 00003",
+    audio: "audio-3.mp3",
+    video: "video-3.mp4",
+    visual: 1.36
+  }
+]
 
 const ENTRY_DURATION_MS = 9000;
 const HOLD_THRESHOLD_MS = 420;
@@ -23,6 +43,10 @@ let noiseData;
 let appState = "landing"; // landing, woken, entering, chamber
 let activeChamber = 0;
 let entryProgress = 0;
+
+function chamberVisualFactor() {
+  return CHAMBERS[activeChamber]?.visual ?? 1;
+}
 
 let splashStarted = false;
 let chamberStarted = false;
@@ -143,6 +167,7 @@ async function enterChamber() {
 }
 
 async function nextChamber() {
+  if (CHAMBERS.length <= 1) return;
   const next = (activeChamber + 1) % CHAMBERS.length;
   setChamber(next);
   appState = "entering";
@@ -316,24 +341,25 @@ function loop(now) {
   const wake = Math.max(appState !== "landing" ? wakeMix * 0.65 : 0, touchPulse);
   const chamberMix = 1 - Math.pow(1 - entryProgress, 2.15);
   const pressure = Math.min(1, holdMix + holdBreak * 0.65);
+  const vf = chamberVisualFactor();
 
   if ((appState === "entering" || appState === "chamber") && entryProgress > 0.55 && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
     ambientDisturbUntil = now + 900 + Math.random() * 800;
     nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
   }
 
-  let intensity = 1.35 + wake * 1.4 + chamberMix * 3.8 + pressure * 1.35;
+  let intensity = 1.35 + wake * 1.4 + chamberMix * (3.8 * vf) + pressure * (1.35 * vf);
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
   }
 
-  drawField(T, wake, chamberMix, pressure);
+  drawField(T, wake, chamberMix * vf, pressure * vf);
   drawNoise(intensity);
 
   const glitchKick = holdGlitch * (0.35 + Math.random() * 0.65);
-  const dx = Math.sin(T * .19) * (.18 + wake * 0.14 + chamberMix * 0.10 + pressure * 0.11) + driftImpulse + Math.sin(T * 8.0) * glitchKick * 1.4;
-  const dy = Math.cos(T * .17) * (.24 + wake * 0.12 + chamberMix * 0.10 + pressure * 0.10) + driftImpulse * .42 + Math.cos(T * 6.8) * glitchKick * 1.1;
+  const dx = Math.sin(T * .19) * (.18 + wake * 0.14 + chamberMix * (0.10 * vf) + pressure * (0.11 * vf)) + driftImpulse + Math.sin(T * 8.0) * glitchKick * (1.4 * vf);
+  const dy = Math.cos(T * .17) * (.24 + wake * 0.12 + chamberMix * (0.10 * vf) + pressure * (0.10 * vf)) + driftImpulse * .42 + Math.cos(T * 6.8) * glitchKick * (1.1 * vf);
   const scaleY = 1 - chamberMix * .05 - wake * 0.01 - pressure * 0.02;
   const scaleX = 1 - chamberMix * .01 + pressure * 0.004;
   const microWarp = Math.sin(T * 0.6) * (0.18 + wake * 0.20 + pressure * 0.18) + Math.cos(T * 0.4) * (0.16 + wake * 0.18 + pressure * 0.18);
@@ -347,7 +373,7 @@ function loop(now) {
   landingText.style.opacity = `${Math.max(0.04, baseOpacity + flicker)}`;
   landingText.style.filter = `blur(${0.52 + chamberMix * 0.44 + wake * 0.06 + pressure * 0.12}px)`;
 
-  let brightness = 1 + wake * 0.08 - chamberMix * 0.06 + pressure * 0.045;
+  let brightness = 1 + wake * 0.08 - chamberMix * (0.06 * vf) + pressure * (0.045 * vf);
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     brightness -= left * 0.035;
@@ -361,7 +387,7 @@ function loop(now) {
     video.style.opacity = Math.max(0, Math.min(0.92, videoOpacity)).toFixed(3);
 
     const videoBrightness = 0.90 + Math.sin(T * 0.12 + 0.8) * 0.018 + pressure * 0.04;
-    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02 + pressure * 0.12;
+    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02 + pressure * (0.12 * vf);
     video.style.filter = `blur(${2.6 - videoMix * 0.9 - pressure * 0.5}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
   }
 
@@ -385,7 +411,7 @@ function loop(now) {
     if (appState === "entering" || appState === "chamber") {
       const chamberCross = Math.pow(Math.max(0, (entryProgress - 0.10) / 0.90), 1.65);
       chamberVol = Math.max(0, chamberTargetVolume * chamberCross);
-      chamberVol += pressure * 0.09;
+      chamberVol += pressure * (0.09 * vf);
       chamberVol += Math.sin(T * (0.8 + pressure * 1.2)) * pressure * 0.025;
     }
     chamberAudio.volume = Math.max(0, Math.min(1, chamberVol));

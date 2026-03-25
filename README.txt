@@ -10,3 +10,10 @@ Interaction:
 - Tap 2: enter chamber 1
 - Tap in chamber: next chamber
 - Hold in chamber: intensify current chamber
+
+
+MOBILE V4 changes:
+- prewired 3 chambers
+- expected files now use audio-1/video-1, audio-2/video-2, audio-3/video-3
+- each chamber has its own title and deeper visual intensity
+- tap in chamber now cycles through the 3 rooms
