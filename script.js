@@ -19,15 +19,15 @@ const CHAMBERS = [
     visual: 1.00
   },
   {
-    title1: "Holding Pattern",
-    title2: ".. 00002",
+    title1: "Somewhere Else",
+    title2: ".. Side B",
     audio: "audio-2.mp3",
     video: "video-2.mp4",
     visual: 1.18
   },
   {
-    title1: "No Appeal",
-    title2: ".. 00003",
+    title1: "Frogman",
+    title2: ".. Blockchain",
     audio: "audio-3.mp3",
     video: "video-3.mp4",
     visual: 1.36
