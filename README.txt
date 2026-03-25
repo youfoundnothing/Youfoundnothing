@@ -27,3 +27,16 @@ V46 changes:
 - first completed press wakes splash only
 - second completed press begins chamber transition
 - chamber audio is primed on first press and faded in on second
+
+
+V46 changes:
+- stages now advance only on completed press/release cycles
+- first completed press wakes splash only
+- second completed press begins chamber transition
+- chamber audio is primed on first press and faded in on second
+
+
+V47 changes:
+- chamber audio no longer starts on first press; it only starts on the second completed press
+- first completed press starts only splash audio and wake visuals
+- second completed press starts chamber audio/video and transition
