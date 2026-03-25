@@ -22,6 +22,7 @@ const traceFloor = 0.025;
 let audioStarted = false;
 let mediaUnlocked = false;
 let unlockInFlight = false;
+let pressCount = 0;
 let entered = false;
 let lastFrame = performance.now();
 let driftImpulse = 0;
@@ -94,15 +95,24 @@ async function startMediaIfNeeded() {
 
 function beginPress(e) {
   if (e && e.cancelable) e.preventDefault();
+
+  // first press: only unlock/start splash layer
+  if (pressCount === 0) {
+    pressCount = 1;
+    if (!mediaUnlocked && !unlockInFlight) {
+      startMediaIfNeeded();
+    }
+    return;
+  }
+
+  // second press and onward: trigger chamber transition
   if (entered) return;
   targetProgress = 1;
 
-  // try immediately on press so hold can work
   if (!mediaUnlocked && !unlockInFlight) {
     startMediaIfNeeded();
   }
 
-  // visual passage can begin immediately
   if (vid.paused) {
     try {
       if (vid.readyState >= 1 && vid.duration && isFinite(vid.duration) && vid.duration > 0) {

@@ -101,3 +101,9 @@ V41 changes:
 - audio unlock now retries on both press and release
 - mediaUnlocked is only set after playback actually starts
 - fixes the case where hold failed because unlock was marked before audio really started
+
+
+V42 changes:
+- first press only unlocks/starts the splash layer
+- second press triggers chamber transition/audio behavior
+- keeps the press/release audio fallback logic from v41
