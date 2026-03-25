@@ -107,3 +107,10 @@ V42 changes:
 - first press only unlocks/starts the splash layer
 - second press triggers chamber transition/audio behavior
 - keeps the press/release audio fallback logic from v41
+
+
+V43 changes:
+- first press now only wakes the splash layer
+- splash becomes more visible / more excited on first press
+- second press begins the chamber transition and chamber audio
+- chamber audio stays at 0 until second press

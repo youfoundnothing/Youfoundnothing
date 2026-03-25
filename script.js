@@ -23,6 +23,7 @@ let audioStarted = false;
 let mediaUnlocked = false;
 let unlockInFlight = false;
 let pressCount = 0;
+let firstPressActive = false;
 let entered = false;
 let lastFrame = performance.now();
 let driftImpulse = 0;
@@ -96,22 +97,21 @@ async function startMediaIfNeeded() {
 function beginPress(e) {
   if (e && e.cancelable) e.preventDefault();
 
-  // first press: only unlock/start splash layer
   if (pressCount === 0) {
     pressCount = 1;
+    firstPressActive = true;
+
     if (!mediaUnlocked && !unlockInFlight) {
       startMediaIfNeeded();
     }
     return;
   }
 
-  // second press and onward: trigger chamber transition
-  if (entered) return;
-  targetProgress = 1;
-
   if (!mediaUnlocked && !unlockInFlight) {
     startMediaIfNeeded();
   }
+
+  targetProgress = 1;
 
   if (vid.paused) {
     try {
@@ -216,7 +216,9 @@ function loop(now) {
     progress = Math.max(targetProgress, progress - step);
   }
 
-  if (targetProgress > 0) {
+  const wake = firstPressActive ? 1 : 0;
+
+  if (targetProgress > 0 || firstPressActive) {
     touchInfluence = Math.min(1, touchInfluence + 0.02);
   } else {
     touchInfluence = Math.max(0, touchInfluence - 0.02);
@@ -230,7 +232,7 @@ function loop(now) {
     nextAmbientDisturbAt = now + 20000 + Math.random() * 26000;
   }
 
-  let intensity = 1.25 + eased * 4.2;
+  let intensity = 1.25 + eased * 4.2 + wake * 1.0;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
@@ -241,12 +243,12 @@ function loop(now) {
 
   const dx = Math.sin(T * .19) * (.16 + touchInfluence * 0.12) + driftImpulse;
   const dy = Math.cos(T * .17) * (.22 + touchInfluence * 0.12) + driftImpulse * .42;
-  const scaleY = 1 - eased * .05;
+  const scaleY = 1 - eased * .05 - wake * 0.01;
   const scaleX = 1 - eased * .01;
   const microWarp = Math.sin(T * 0.6) * 0.002 + Math.cos(T * 0.4) * 0.002;
   const textDx = dx * (1 - eased * .10);
   const textDy = dy * (1 - eased * .08);
-  const baseOpacity = Math.max(0.04, 0.42 - eased * 0.38);
+  const baseOpacity = Math.max(0.04, 0.42 + wake * 0.08 - eased * 0.38);
   const flicker = Math.sin(T * 1.7) * 0.015;
 
   t.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY}) skewX(${microWarp}deg)`;
@@ -254,14 +256,14 @@ function loop(now) {
   t.style.opacity = `${Math.max(0.04, baseOpacity + flicker)}`;
   t.style.filter = `blur(${0.72 + eased * 0.32}px)`;
 
-  let brightness = 1 - eased * 0.08;
+  let brightness = 1 + wake * 0.05 - eased * 0.08;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     brightness -= left * 0.035;
   }
   document.body.style.filter = `brightness(${brightness})`;
 
-  if (!vid.paused || progress > 0.001) {
+  if ((!vid.paused || progress > 0.001) && pressCount >= 2) {
     const videoOpacity = 0.03 + visibleMix * 0.82 + Math.sin(T * 0.19) * 0.008;
     vid.style.opacity = Math.max(0, Math.min(0.86, videoOpacity)).toFixed(3);
 
