@@ -2,38 +2,50 @@ const bg = document.getElementById("bg");
 const bctx = bg.getContext("2d");
 const noise = document.getElementById("noise");
 const nctx = noise.getContext("2d");
-const text = document.getElementById("text");
-const chamberTitle = document.getElementById("chamberTitle");
+const landingText = document.getElementById("landingText");
+const chamberMeta = document.getElementById("chamberMeta");
+const metaLine1 = document.getElementById("metaLine1");
+const metaLine2 = document.getElementById("metaLine2");
 const video = document.getElementById("video");
 const splashAudio = document.getElementById("splashAudio");
 const chamberAudio = document.getElementById("chamberAudio");
 
-video.src = "video.mp4";
-splashAudio.src = "splash.mp3";
-chamberAudio.src = "audio.mp3";
+const CHAMBERS = [
+  {
+    title1: "Traffic Court",
+    title2: ".. 33310",
+    audio: "audio.mp3",
+    video: "video.mp4"
+  }
+];
+
+const HOLD_THRESHOLD_MS = 360;
+const ENTRY_DURATION_MS = 9000;
 
 let w = 0, h = 0;
 let noiseData;
 
-let stage = 0; // 0 landing, 1 splash-woken, 2 chamber transition/chamber
-let transitionProgress = 0;
-const transitionMs = 9000;
+let stage = "landing"; // landing -> woken -> entering -> chamber
+let activeChamber = 0;
 
-let splashReady = false;
-let chamberStarted = false;
-let pointerIsDown = false;
+let entryProgress = 0;
+let wakeMix = 0;
+let holdMix = 0;
+let touchPulse = 0;
+
+let pointerDown = false;
+let pointerStart = 0;
+let pointerTriggeredHold = false;
 let activePointerId = null;
-let pressVisual = 0;
-let wakeLevel = 0;
+
+let splashStarted = false;
+let chamberStarted = false;
+
 let driftImpulse = 0;
 let lastImpulse = 0;
 let ambientDisturbUntil = 0;
 let nextAmbientDisturbAt = 0;
 let lastFrame = performance.now();
-
-// hard gate so one quick tap can never count as both first and second press
-let stageCooldownUntil = 0;
-const interStageCooldownMs = 700;
 
 const splashTargetVolume = 0.42;
 const chamberTargetVolume = 0.58;
@@ -49,9 +61,21 @@ function resize() {
 }
 addEventListener("resize", resize);
 
+function setChamber(index) {
+  const c = CHAMBERS[index];
+  activeChamber = index;
+  metaLine1.textContent = c.title1;
+  metaLine2.textContent = c.title2;
+  chamberAudio.src = c.audio;
+  video.src = c.video;
+  chamberStarted = false;
+}
+
 async function startSplashIfNeeded() {
-  if (splashReady) return;
-  splashReady = true;
+  if (splashStarted) return;
+  splashStarted = true;
+  splashAudio.src = "splash.mp3";
+  splashAudio.loop = false;
   splashAudio.muted = false;
   splashAudio.volume = 0;
   try {
@@ -65,15 +89,16 @@ async function startSplashIfNeeded() {
 async function startChamberIfNeeded() {
   if (chamberStarted) return;
   chamberStarted = true;
+  chamberAudio.loop = true;
   chamberAudio.muted = false;
   chamberAudio.volume = 0;
   try {
+    if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
+      chamberAudio.currentTime = Math.random() * chamberAudio.duration;
+    }
+  } catch (e) {}
+  try {
     await chamberAudio.play();
-    try {
-      if (chamberAudio.readyState >= 1 && chamberAudio.duration && isFinite(chamberAudio.duration) && chamberAudio.duration > 0) {
-        chamberAudio.currentTime = Math.random() * chamberAudio.duration;
-      }
-    } catch (e) {}
   } catch (e) {
     console.error("chamber play failed", e);
     chamberStarted = false;
@@ -91,46 +116,75 @@ async function startVideoIfNeeded() {
   video.play().catch(() => {});
 }
 
+async function wakeSplash() {
+  if (stage !== "landing") return;
+  stage = "woken";
+  wakeMix = 1;
+  touchPulse = 1;
+  await startSplashIfNeeded();
+  splashAudio.volume = splashTargetVolume * 0.75;
+}
+
+async function enterChamber() {
+  if (stage !== "woken") return;
+  stage = "entering";
+  entryProgress = 0;
+  touchPulse = 1;
+  setChamber(activeChamber);
+  await startChamberIfNeeded();
+  await startVideoIfNeeded();
+}
+
+function nextChamber() {
+  const next = (activeChamber + 1) % CHAMBERS.length;
+  setChamber(next);
+  entryProgress = 0.65;
+  stage = "entering";
+  startChamberIfNeeded();
+  startVideoIfNeeded();
+}
+
+function beginHold() {
+  if (stage === "chamber") {
+    pointerTriggeredHold = false;
+  }
+}
+
 function onPointerDown(e) {
   if (e && e.cancelable) e.preventDefault();
-  if (pointerIsDown) return;
-  pointerIsDown = true;
+  if (pointerDown) return;
+  pointerDown = true;
   activePointerId = e.pointerId ?? "mouse";
-  pressVisual = 1;
+  pointerStart = performance.now();
+  pointerTriggeredHold = false;
+  touchPulse = 1;
+  beginHold();
 }
 
 async function onPointerUp(e) {
   if (e && e.cancelable) e.preventDefault();
   const pid = e.pointerId ?? "mouse";
-  if (!pointerIsDown || activePointerId !== pid) return;
+  if (!pointerDown || activePointerId !== pid) return;
 
-  pointerIsDown = false;
+  pointerDown = false;
   activePointerId = null;
 
-  const now = performance.now();
-  if (now < stageCooldownUntil) {
+  if (pointerTriggeredHold) {
     return;
   }
 
-  // First completed press = splash only
-  if (stage === 0) {
-    stage = 1;
-    wakeLevel = 1;
-    stageCooldownUntil = now + interStageCooldownMs;
-    await startSplashIfNeeded();
-    splashAudio.volume = splashTargetVolume * 0.55;
-    chamberAudio.volume = 0;
+  if (stage === "landing") {
+    await wakeSplash();
     return;
   }
 
-  // Second completed press = chamber begins
-  if (stage === 1) {
-    stage = 2;
-    stageCooldownUntil = now + interStageCooldownMs;
-    await startSplashIfNeeded();
-    await startChamberIfNeeded();
-    await startVideoIfNeeded();
+  if (stage === "woken") {
+    await enterChamber();
     return;
+  }
+
+  if (stage === "chamber") {
+    nextChamber();
   }
 }
 
@@ -139,7 +193,7 @@ document.body.addEventListener("pointerdown", onPointerDown, { passive: false })
 document.body.addEventListener("pointerup", onPointerUp, { passive: false });
 document.body.addEventListener("pointercancel", onPointerUp, { passive: false });
 
-function drawField(T, wakeMix, chamberMix) {
+function drawField(T, wake, chamber, hold) {
   bctx.fillStyle = "rgb(10,10,10)";
   bctx.fillRect(0, 0, w, h);
 
@@ -152,14 +206,14 @@ function drawField(T, wakeMix, chamberMix) {
 
   for (let i = 0; i < masses.length; i++) {
     const m = masses[i];
-    const x = w * m[0] + Math.sin(T * (0.08 + i * 0.02) + i) * w * (0.045 + wakeMix * 0.012 + chamberMix * 0.01);
-    const y = h * m[1] + Math.cos(T * (0.06 + i * 0.015) + i * 0.8) * h * (0.04 + wakeMix * 0.01 + chamberMix * 0.01);
-    const r = Math.max(w, h) * m[2] * (1 + Math.sin(T * (0.12 + i * 0.02) + i) * (0.09 + wakeMix * 0.06 + chamberMix * 0.04));
+    const x = w * m[0] + Math.sin(T * (0.08 + i * 0.02) + i) * w * (0.046 + wake * 0.014 + chamber * 0.012 + hold * 0.015);
+    const y = h * m[1] + Math.cos(T * (0.06 + i * 0.015) + i * 0.8) * h * (0.042 + wake * 0.010 + chamber * 0.010 + hold * 0.014);
+    const r = Math.max(w, h) * m[2] * (1 + Math.sin(T * (0.12 + i * 0.02) + i) * (0.09 + wake * 0.07 + chamber * 0.05 + hold * 0.06));
 
-    const core = Math.min(240, m[3] + wakeMix * 24 + chamberMix * 16);
+    const core = Math.min(242, m[3] + wake * 28 + chamber * 16 + hold * 16);
     const grad = bctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, `rgba(${core}, ${core - 8}, ${core - 8}, ${0.19 + wakeMix * 0.08 + chamberMix * 0.03})`);
-    grad.addColorStop(0.34, `rgba(${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${Math.max(55, core-90)}, ${0.15 + wakeMix * 0.03})`);
+    grad.addColorStop(0, `rgba(${core}, ${core - 8}, ${core - 8}, ${0.20 + wake * 0.08 + chamber * 0.04 + hold * 0.05})`);
+    grad.addColorStop(0.34, `rgba(${Math.max(55, core-92)}, ${Math.max(55, core-92)}, ${Math.max(55, core-92)}, ${0.15 + wake * 0.03 + hold * 0.04})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     bctx.fillStyle = grad;
     bctx.beginPath();
@@ -169,10 +223,10 @@ function drawField(T, wakeMix, chamberMix) {
 
   const gx = w * (0.5 + Math.sin(T * 0.05) * 0.028);
   const gy = h * (0.54 + Math.cos(T * 0.045) * 0.025);
-  const gr = Math.max(w, h) * (0.44 + wakeMix * 0.025 + chamberMix * 0.01);
+  const gr = Math.max(w, h) * (0.44 + wake * 0.025 + chamber * 0.01 + hold * 0.012);
   const redGlow = bctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-  redGlow.addColorStop(0, `rgba(118, 18, 18, ${0.10 + wakeMix * 0.06})`);
-  redGlow.addColorStop(0.46, `rgba(54, 8, 8, ${0.05 + wakeMix * 0.02})`);
+  redGlow.addColorStop(0, `rgba(118, 18, 18, ${0.10 + wake * 0.06 + hold * 0.04})`);
+  redGlow.addColorStop(0.46, `rgba(54, 8, 8, ${0.05 + wake * 0.02 + hold * 0.02})`);
   redGlow.addColorStop(1, "rgba(0,0,0,0)");
   bctx.fillStyle = redGlow;
   bctx.fillRect(0, 0, w, h);
@@ -201,81 +255,96 @@ function loop(now) {
   }
   driftImpulse *= .968;
 
-  if (stage === 2 && transitionProgress < 1) {
-    transitionProgress = Math.min(1, transitionProgress + dt / transitionMs);
+  if (stage === "entering" && entryProgress < 1) {
+    entryProgress = Math.min(1, entryProgress + dt / ENTRY_DURATION_MS);
+    if (entryProgress >= 1) {
+      stage = "chamber";
+    }
   }
 
   if (pressVisual > 0) {
     pressVisual = Math.max(0, pressVisual - 0.018);
   }
 
-  const wakeMix = Math.max(stage >= 1 ? wakeLevel * 0.65 : 0, pressVisual);
-  const chamberMix = 1 - Math.pow(1 - transitionProgress, 2.15);
+  if (pointerDown && stage === "chamber") {
+    const heldMs = now - pointerStart;
+    if (heldMs >= HOLD_THRESHOLD_MS) {
+      pointerTriggeredHold = true;
+      holdMix = Math.min(1, holdMix + 0.035);
+    }
+  } else {
+    holdMix = Math.max(0, holdMix - 0.04);
+  }
 
-  if (stage === 2 && transitionProgress > 0.55 && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
+  const chamberMix = 1 - Math.pow(1 - entryProgress, 2.15);
+  const wake = Math.max(stage !== "landing" ? wakeMix * 0.65 : 0, pressVisual);
+
+  if ((stage === "entering" || stage === "chamber") && entryProgress > 0.55 && now > nextAmbientDisturbAt && ambientDisturbUntil < now) {
     ambientDisturbUntil = now + 900 + Math.random() * 800;
     nextAmbientDisturbAt = now + 18000 + Math.random() * 22000;
   }
 
-  let intensity = 1.35 + wakeMix * 1.4 + chamberMix * 3.8;
+  let intensity = 1.35 + wake * 1.4 + chamberMix * 3.8 + holdMix * 0.9;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     intensity += 0.9 * Math.max(0.2, left);
   }
 
-  drawField(T, wakeMix, chamberMix);
+  drawField(T, wake, chamberMix, holdMix);
   drawNoise(intensity);
 
-  const dx = Math.sin(T * .19) * (.18 + wakeMix * 0.14 + chamberMix * 0.10) + driftImpulse;
-  const dy = Math.cos(T * .17) * (.24 + wakeMix * 0.12 + chamberMix * 0.10) + driftImpulse * .42;
-  const scaleY = 1 - chamberMix * .05 - wakeMix * 0.01;
+  const dx = Math.sin(T * .19) * (.18 + wake * 0.14 + chamberMix * 0.10 + holdMix * 0.08) + driftImpulse;
+  const dy = Math.cos(T * .17) * (.24 + wake * 0.12 + chamberMix * 0.10 + holdMix * 0.08) + driftImpulse * .42;
+  const scaleY = 1 - chamberMix * .05 - wake * 0.01;
   const scaleX = 1 - chamberMix * .01;
-  const microWarp = Math.sin(T * 0.6) * (0.18 + wakeMix * 0.20) + Math.cos(T * 0.4) * (0.16 + wakeMix * 0.18);
+  const microWarp = Math.sin(T * 0.6) * (0.18 + wake * 0.20 + holdMix * 0.10) + Math.cos(T * 0.4) * (0.16 + wake * 0.18 + holdMix * 0.10);
   const textDx = dx * (1 - chamberMix * .10);
   const textDy = dy * (1 - chamberMix * .08);
-  const baseOpacity = Math.max(0.08, 0.78 + wakeMix * 0.10 - chamberMix * 0.52);
-  const flicker = Math.sin(T * (1.7 + wakeMix * 0.9)) * (0.015 + wakeMix * 0.02);
+  const baseOpacity = Math.max(0.08, 0.82 + wake * 0.08 - chamberMix * 0.56);
+  const flicker = Math.sin(T * (1.7 + wake * 0.9 + holdMix * 0.6)) * (0.015 + wake * 0.02 + holdMix * 0.01);
 
-  text.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY}) skewX(${microWarp}deg)`;
-  text.style.letterSpacing = `${0.028 - chamberMix * 0.008 + wakeMix * 0.004}em`;
-  text.style.opacity = `${Math.max(0.06, baseOpacity + flicker)}`;
-  text.style.filter = `blur(${0.55 + chamberMix * 0.42 + wakeMix * 0.05}px)`;
+  landingText.style.transform = `translate(calc(-50% + ${textDx}px), calc(-50% + ${textDy}px)) scaleX(${scaleX}) scaleY(${scaleY}) skewX(${microWarp}deg)`;
+  landingText.style.letterSpacing = `${0.028 - chamberMix * 0.008 + wake * 0.004}em`;
+  landingText.style.opacity = `${Math.max(0.06, baseOpacity + flicker)}`;
+  landingText.style.filter = `blur(${0.52 + chamberMix * 0.44 + wake * 0.06}px)`;
 
-  let brightness = 1 + wakeMix * 0.08 - chamberMix * 0.06;
+  let brightness = 1 + wake * 0.08 - chamberMix * 0.06 + holdMix * 0.03;
   if (now < ambientDisturbUntil) {
     const left = (ambientDisturbUntil - now) / 1700;
     brightness -= left * 0.035;
   }
   document.body.style.filter = `brightness(${brightness})`;
 
-  const videoMix = Math.max(0, Math.pow(Math.max(0, (transitionProgress - 0.14) / 0.86), 1.2));
+  const videoMix = Math.max(0, Math.pow(Math.max(0, (entryProgress - 0.14) / 0.86), 1.2));
   if (!video.paused || videoMix > 0.001) {
     const videoOpacity = 0.02 + videoMix * 0.84 + Math.sin(T * 0.19) * 0.007;
     video.style.opacity = Math.max(0, Math.min(0.88, videoOpacity)).toFixed(3);
 
     const videoBrightness = 0.90 + Math.sin(T * 0.12 + 0.8) * 0.018;
-    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02;
-    video.style.filter = `blur(${2.6 - videoMix * 0.9}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
+    const videoContrast = 1.10 + Math.sin(T * 0.09) * 0.02 + holdMix * 0.04;
+    video.style.filter = `blur(${2.6 - videoMix * 0.9 - holdMix * 0.25}px) contrast(${videoContrast}) brightness(${videoBrightness}) saturate(.78)`;
   }
 
-  chamberTitle.style.opacity = `${Math.max(0, Math.min(0.92, (transitionProgress - 0.18) / 0.50))}`;
+  chamberTitle.style.opacity = `${Math.max(0, Math.min(0.92, (entryProgress - 0.18) / 0.50))}`;
   chamberTitle.style.transform = `translateX(-50%) translateY(${Math.sin(T * 0.9) * 0.6}px)`;
 
-  if (splashReady) {
-    let splashVol = 0;
-    let chamberVol = 0;
+  let splashVol = 0;
+  let chamberVol = 0;
 
-    if (stage === 1) {
-      splashVol = splashTargetVolume * (0.42 + wakeMix * 0.5);
-      chamberVol = 0;
-    } else if (stage === 2) {
-      const cross = Math.pow(transitionProgress, 1.08);
-      const chamberCross = Math.pow(Math.max(0, (transitionProgress - 0.10) / 0.90), 1.65);
+  if (splashReady) {
+    if (stage === "woken") {
+      splashVol = splashTargetVolume * (0.42 + wake * 0.5);
+    } else if (stage === "entering" || stage === "chamber") {
+      const cross = Math.pow(entryProgress, 1.08);
+      const chamberCross = Math.pow(Math.max(0, (entryProgress - 0.10) / 0.90), 1.65);
       splashVol = Math.max(0, splashTargetVolume * (1 - cross));
-      chamberVol = Math.max(0, chamberTargetVolume * chamberCross);
+      chamberVol = Math.max(0, chamberTargetVolume * chamberCross) + holdMix * 0.06;
     }
 
     splashAudio.volume = Math.min(1, splashVol);
+  }
+
+  if (chamberStarted) {
     chamberAudio.volume = Math.min(1, chamberVol);
   }
 
@@ -283,4 +352,5 @@ function loop(now) {
 }
 
 resize();
+setChamber(0);
 requestAnimationFrame(loop);

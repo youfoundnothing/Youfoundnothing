@@ -17,13 +17,13 @@ body {
 
 #bg, #noise, #video {
   position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  inset: 0;
 }
 
 #bg {
-  filter: blur(7px) contrast(165%) brightness(1.95) saturate(0.82);
+  filter: blur(7px) contrast(168%) brightness(2.0) saturate(0.84);
 }
 
 #noise {
@@ -46,26 +46,26 @@ body {
   top: 61%;
   transform: translate(-50%, -50%);
   font-family: Georgia, serif;
-  font-size: clamp(16px, 4.4vw, 28px);
-  color: rgba(148,148,148,.72);
+  font-size: clamp(17px, 4.8vw, 30px);
+  color: rgba(154,154,154,.78);
   pointer-events: none;
   z-index: 3;
 }
 
 .stack {
   white-space: normal;
-  line-height: 0.96;
+  line-height: .96;
   display: inline-block;
   letter-spacing: .028em;
-  filter: blur(.58px);
+  filter: blur(.52px);
 }
 
 .stack span {
   display: block;
 }
 
-#text {
-  opacity: .78;
+#landingText {
+  opacity: .82;
 }
 
 .chamber-meta {
@@ -75,7 +75,7 @@ body {
   transform: translateX(-50%);
   font-family: Georgia, serif;
   font-size: clamp(14px, 3.6vw, 23px);
-  color: rgba(160,160,160,.78);
+  color: rgba(162,162,162,.82);
   text-align: center;
   z-index: 4;
   opacity: 0;

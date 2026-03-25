@@ -11,20 +11,20 @@
   <canvas id="noise"></canvas>
 
   <div id="wrap">
-    <div id="text" class="stack">
+    <div id="landingText" class="stack">
       <span>You</span><br>
       <span>Found</span><br>
       <span>Nothing.</span>
     </div>
   </div>
 
-  <div id="chamberTitle" class="stack chamber-meta" aria-hidden="true">
-    <span>Traffic Court</span><br>
-    <span>.. 33310</span>
+  <div id="chamberMeta" class="stack chamber-meta" aria-hidden="true">
+    <span id="metaLine1">Traffic Court</span><br>
+    <span id="metaLine2">.. 33310</span>
   </div>
 
   <video id="video" loop playsinline muted preload="auto"></video>
-  <audio id="splashAudio" loop preload="auto"></audio>
+  <audio id="splashAudio" preload="auto"></audio>
   <audio id="chamberAudio" loop preload="auto"></audio>
 
   <script src="script.js"></script>
